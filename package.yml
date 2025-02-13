@@ -6,6 +6,8 @@ supportpage: https://github.com/your/repo
 requires:
     php: '>=8.1'
     redaxo: '>=5.18.1'
+    packages:
+        yform: '>=4.0.0'
 
 page:
     title: 'Table Builder'
@@ -22,6 +24,9 @@ page:
         query:
             title: 'Query Builder'
             icon: rex-icon fa-database
+        yorm:
+            title: 'YORM Generator'
+            icon: rex-icon fa-code
         sql:
             title: 'SQL Export'
             icon: rex-icon fa-code
