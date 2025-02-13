@@ -73,10 +73,6 @@ if ($message) {
     $content .= rex_view::success($message);
 }
 
-// Create form
-$form = new rex_form_base('dummy');
-$form->addInputField('text', 'table_name', 'Tabellenname:', ['class' => 'form-control']);
-
 // Column template for JavaScript
 $columnTemplate = '
 <div class="column-row">
@@ -116,14 +112,12 @@ $columnTemplate .= '
     </div>
 </div>';
 
-$content .= '
-<div class="rex-form">
+$fragment = new rex_fragment();
+$fragment->setVar('class', 'edit', false);
+$fragment->setVar('title', 'Neue Tabelle erstellen');
+$fragment->setVar('body', '
     <form action="' . rex_url::currentBackendPage() . '" method="post">
-        <div class="panel panel-edit">
-            <header class="panel-heading">
-                <div class="panel-title">Neue Tabelle erstellen</div>
-            </header>
-            
+        <div class="panel panel-default">
             <div class="panel-body">
                 <div class="form-group">
                     <label for="table_name">Tabellenname:</label>
@@ -149,42 +143,44 @@ $content .= '
             </footer>
         </div>
     </form>
-</div>
 
-<script type="text/template" id="column-template">
-' . $columnTemplate . '
-</script>
+    <script type="text/template" id="column-template">
+    ' . $columnTemplate . '
+    </script>
 
-<script>
-let columnIndex = 0;
+    <script>
+    let columnIndex = 0;
 
-function addColumn() {
-    const container = document.getElementById("columns-container");
-    const template = document.getElementById("column-template").innerHTML;
-    
-    // Replace placeholder index
-    const html = template.replace(/{{index}}/g, columnIndex++);
-    
-    // Create temporary element to convert string to DOM
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    
-    // Add new column row
-    container.appendChild(temp.firstElementChild);
-}
+    function addColumn() {
+        const container = document.getElementById("columns-container");
+        const template = document.getElementById("column-template").innerHTML;
+        
+        // Replace placeholder index
+        const html = template.replace(/{{index}}/g, columnIndex++);
+        
+        // Create temporary element to convert string to DOM
+        const temp = document.createElement("div");
+        temp.innerHTML = html;
+        
+        // Add new column row
+        container.appendChild(temp.firstElementChild);
+    }
 
-function removeColumn(button) {
-    const row = button.closest(".column-row");
-    row.remove();
-}
+    function removeColumn(button) {
+        const row = button.closest(".column-row");
+        row.remove();
+    }
 
-// Add first column row
-addColumn();
-</script>';
+    // Add first column row
+    addColumn();
+    </script>
+', false);
 
-echo $content;
+$content .= $fragment->parse('core/page/section.php');
 
 // Show schema if available
 if (isset($schema)) {
     echo rex_view::info('<p><strong>SQL Schema:</strong></p><pre>' . rex_escape($schema) . '</pre>');
 }
+
+echo $content;
