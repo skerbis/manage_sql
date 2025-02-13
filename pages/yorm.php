@@ -109,9 +109,25 @@ if ($selectedTable && !empty($columns)) {
 
             $type = $typeMap[$field['type_name']] ?? 'mixed';
 
+            // Bestimme den Return-Type basierend auf dem Feldtyp
+            $returnType = match($field['type_name']) {
+                'text', 'textarea', 'select', 'email', 'be_media', 'be_medialist', 'choice' => 'string',
+                'integer', 'be_link' => 'int',
+                'float', 'decimal' => 'float',
+                'checkbox', 'radio' => 'bool',
+                'date', 'datetime', 'time' => '?\\DateTime',
+                'be_manager_relation' => 'rex_yform_manager_collection',
+                default => 'mixed', // Unbekannter Typ
+            };
+
+            $nullable = str_starts_with($returnType, '?');
+            if ($returnType !== 'mixed' && !$nullable) {
+                $returnType =  $returnType;
+            }
+
             $modelCode[] = '    /**';
             $modelCode[] = '     * ' . $label;
-            $modelCode[] = '     * @return ' . $type;
+            $modelCode[] = '     * @return ' . $returnType;
             $modelCode[] = '     */';
 
             // Spezielle Behandlung für Datums-/Zeitfelder
@@ -142,7 +158,7 @@ if ($selectedTable && !empty($columns)) {
 
             } else {
                 // Standard-Getter
-                $modelCode[] = '    public function ' . $methodName . '()';
+                $modelCode[] = '    public function ' . $methodName . '(): ' . $returnType; // Return type hinzugefügt
                 $modelCode[] = '    {';
                 $modelCode[] = '        return $this->getValue(\'' . $name . '\');';
                 $modelCode[] = '    }';
@@ -167,7 +183,6 @@ if ($selectedTable && !empty($columns)) {
     $modelCode[] = '    public static function getById(int $id): ?' . $className; // Type Hint hinzugefügt
     $modelCode[] = '    {';
     $modelCode[] = '        return self::get($id);';
-    $modelCode[] = '    }';
     $modelCode[] = '';
     $modelCode[] = '}';
 
@@ -225,8 +240,8 @@ if ($selectedTable && !empty($columns)) {
     $editCode[] = '    $yform = $dataset->getForm();';
     $editCode[] = '';
     $editCode[] = '    // Formular konfigurieren';
-    $editCode[] = '    $yform->setObjectparams(\'form_action\', rex_getUrl(REX_ARTICLE_ID));';
-    $editCode[] = '    $yform->setObjectparams(\'form_showformafterupdate\', false);';
+    $editCode[] = '$yform->setObjectparams(\'form_action\', rex_getUrl(REX_ARTICLE_ID));';
+    $editCode[] = '$yform->setObjectparams(\'form_showformafterupdate\', false);';
     $editCode[] = '';
     $editCode[] = '    // Formular ausgeben';
     $editCode[] = '    echo $dataset->executeForm($yform);';
