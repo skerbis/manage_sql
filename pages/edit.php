@@ -103,9 +103,11 @@ if ($dbType === 'mysql') {
 
 // Existing columns
 $columns = $table->getColumns();
+$i = 0; // Zähler für unique IDs
 foreach ($columns as $column) {
     $name = $column->getName();
     if ($name === 'id') continue; // Skip id column
+    $datalistId = 'extra_options_existing_' . $i; // Eindeutige ID
 
     $formContent .= '<div class="column-row panel panel-default">
         <div class="panel-heading">
@@ -143,8 +145,8 @@ $formContent .= '</select>
                 <div class="col-sm-3">
                     <div class="form-group">
                         <label>Extra:</label>
-                        <input type="text" name="columns['.$name.'][extra]" value="'.rex_escape($column->getExtra()).'" class="form-control" list="extra_options_'.$name.'">
-                        <datalist id="extra_options_'.$name.'">';
+                        <input type="text" name="columns['.$name.'][extra]" value="'.rex_escape($column->getExtra()).'" class="form-control" list="'.$datalistId.'">
+                        <datalist id="'.$datalistId.'">';
                          foreach ($extraOptions as $option) {
                             $formContent .= '<option value="' . rex_escape($option) . '">';
                          }
@@ -162,6 +164,7 @@ $formContent .= '</select>
             </div>
         </div>
     </div>';
+    $i++;
 }
 
 // New column form
@@ -236,4 +239,30 @@ $fragment->setVar('body', '
 
 $content .= $fragment->parse('core/page/section.php');
 
-echo $content;
+echo $content;?>
+<style>
+
+    /* Stelle sicher, dass die Datalist angezeigt wird */
+datalist {
+  display: block; /* Oder grid, flex, je nach Layout */
+  position: absolute; /*  Wichtig, um Probleme mit dem Layout zu vermeiden */
+  background-color: #fff; /* Hintergrundfarbe */
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Optional: Schatten */
+  z-index: 10; /* Stell sicher, dass sie über anderen Elementen liegt */
+  width: 100%; /* Passe die Breite an */
+  max-height: 200px;
+  overflow-y: auto;
+
+}
+
+/* Style die Options (optional) */
+datalist option {
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+datalist option:hover {
+  background-color: #f0f0f0;
+}
+</style>
