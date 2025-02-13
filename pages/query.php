@@ -72,7 +72,7 @@ if ($selectedTable && !empty($columns)) {
         <div class="col-sm-6">
             <div class="form-group">
                 <label for="query_type">Query Typ</label>
-                <select name="query_type" id="query_type" class="form-control">
+                <select name="query_type" id="query_type" class="form-control" onchange="toggleQueryOptions(this.value)">
                     <option value="select">SELECT</option>
                     <option value="count">COUNT</option>
                     <option value="insert">INSERT</option>
@@ -82,19 +82,27 @@ if ($selectedTable && !empty($columns)) {
             </div>
         </div>
     
-        <div class="panel panel-default">
+        <div class="panel panel-default select-options">
             <div class="panel-heading">Spalten</div>
             <div class="panel-body">
-                <div class="row">';
+                <div class="row">
+                    <div class="col-sm-12">
+                        <label class="checkbox-inline" style="margin-bottom: 15px;">
+                            <input type="checkbox" name="select_all" id="select_all" checked onclick="toggleAllColumns(this)">
+                            <strong>Alle Spalten (*)</strong>
+                        </label>
+                    </div>
+                </div>
+                <div class="row" id="column-list">';
     
     foreach ($columns as $column) {
         $formContent .= '
-                <div class="col-sm-3">
-                    <label class="checkbox-inline">
-                        <input type="checkbox" name="columns[]" value="'.$column['name'].'" checked>
-                        '.$column['name'].'
-                    </label>
-                </div>';
+                    <div class="col-sm-3">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" name="columns[]" value="'.$column['name'].'" checked class="column-checkbox">
+                            '.$column['name'].'
+                        </label>
+                    </div>';
     }
     
     $formContent .= '
@@ -102,7 +110,7 @@ if ($selectedTable && !empty($columns)) {
             </div>
         </div>
         
-        <div class="panel panel-default">
+        <div class="panel panel-default where-panel">
             <div class="panel-heading">WHERE Bedingungen</div>
             <div class="panel-body" id="where-conditions">
                 <div class="where-row row">
@@ -124,6 +132,8 @@ if ($selectedTable && !empty($columns)) {
                             <option value="<"><</option>
                             <option value="<="><=</option>
                             <option value="LIKE">LIKE</option>
+                            <option value="IN">IN</option>
+                            <option value="NOT IN">NOT IN</option>
                             <option value="IS NULL">IS NULL</option>
                             <option value="IS NOT NULL">IS NOT NULL</option>
                         </select>
@@ -145,7 +155,7 @@ if ($selectedTable && !empty($columns)) {
             </div>
         </div>
         
-        <div class="panel panel-default">
+        <div class="panel panel-default select-options">
             <div class="panel-heading">ORDER BY</div>
             <div class="panel-body" id="orderby-conditions">
                 <div class="orderby-row row">
@@ -178,7 +188,7 @@ if ($selectedTable && !empty($columns)) {
             </div>
         </div>
         
-        <div class="form-group">
+        <div class="form-group select-options">
             <label for="limit">LIMIT</label>
             <input type="number" name="limit" id="limit" class="form-control" min="0">
         </div>
@@ -191,6 +201,29 @@ if ($selectedTable && !empty($columns)) {
 
 $formContent .= '
 <script>
+function toggleQueryOptions(type) {
+    const selectOptions = document.querySelectorAll(".select-options");
+    const wherePanel = document.querySelector(".where-panel");
+    
+    selectOptions.forEach(el => {
+        el.style.display = type === "select" ? "block" : "none";
+    });
+    
+    wherePanel.style.display = ["select", "update", "delete"].includes(type) ? "block" : "none";
+}
+
+function toggleAllColumns(checkbox) {
+    const columnCheckboxes = document.querySelectorAll(".column-checkbox");
+    const columnList = document.getElementById("column-list");
+    
+    columnCheckboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    
+    // Toggle visibility of individual columns
+    columnList.style.display = checkbox.checked ? "none" : "flex";
+}
+
 function addWhereRow() {
     const container = document.getElementById("where-conditions");
     const template = container.querySelector(".where-row").cloneNode(true);
@@ -220,6 +253,30 @@ function removeOrderByRow(button) {
         row.remove();
     }
 }
+
+// Initial state
+document.addEventListener("DOMContentLoaded", function() {
+    const selectAll = document.getElementById("select_all");
+    if (selectAll) {
+        const columnList = document.getElementById("column-list");
+        columnList.style.display = selectAll.checked ? "none" : "flex";
+        
+        // Add event listeners to individual checkboxes
+        const columnCheckboxes = document.querySelectorAll(".column-checkbox");
+        columnCheckboxes.forEach(cb => {
+            cb.addEventListener("change", function() {
+                const allChecked = Array.from(columnCheckboxes).every(cb => cb.checked);
+                document.getElementById("select_all").checked = allChecked;
+            });
+        });
+        
+        // Initial query type options
+        const queryType = document.getElementById("query_type");
+        if (queryType) {
+            toggleQueryOptions(queryType.value);
+        }
+    }
+});
 </script>';
 
 // Add form to content
@@ -235,12 +292,17 @@ echo $content;
  */
 function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limit) {
     $code = [];
+    $code[] = '// Rex SQL Query für '.$table;
     $code[] = '$sql = rex_sql::factory();';
     
     switch ($queryType) {
         case 'select':
             $conditions = [];
             $params = [];
+            
+            // Handle SELECT columns
+            $selectAll = rex_post('select_all', 'boolean');
+            $columnList = $selectAll ? '*' : ($columns ? implode(', ', $columns) : '*');
             
             // Build WHERE conditions
             if (!empty($where['column'])) {
@@ -269,7 +331,7 @@ function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limi
             }
             
             // Build query
-            $query = 'SELECT ' . ($columns ? implode(', ', $columns) : '*') . "\n";
+            $query = 'SELECT ' . $columnList . "\n";
             $query .= 'FROM ' . $table;
             
             if ($conditions) {
@@ -284,39 +346,158 @@ function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limi
                 $query .= "\nLIMIT " . $limit;
             }
             
+            $code[] = '// Query ausführen';
             $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
+            $code[] = '';
+            $code[] = '// Beispiele für Datenzugriff:';
+            $code[] = '// Alle Datensätze als Array';
+            $code[] = '$data = $sql->getArray();';
+            $code[] = '';
+            $code[] = '// Einzelner Datensatz';
+            $code[] = '$sql->getRow();'; 
+            $code[] = '$value = $sql->getValue("spaltenname");';
             break;
             
         case 'count':
-            $code[] = '$sql->setQuery("SELECT COUNT(*) as count FROM ' . $table . '");';
+            $conditions = [];
+            $params = [];
+            
+            if (!empty($where['column'])) {
+                foreach ($where['column'] as $i => $column) {
+                    if ($column && isset($where['operator'][$i])) {
+                        $operator = $where['operator'][$i];
+                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
+                            $conditions[] = $column . ' ' . $operator;
+                        } else {
+                            $paramName = 'where_' . $i;
+                            $conditions[] = $column . ' ' . $operator . ' :' . $paramName;
+                            $params[$paramName] = $where['value'][$i];
+                        }
+                    }
+                }
+            }
+            
+            $query = 'SELECT COUNT(*) as count FROM ' . $table;
+            if ($conditions) {
+                $query .= "\nWHERE " . implode(' AND ', $conditions);
+            }
+            
+            $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
             $code[] = '$count = $sql->getValue("count");';
             break;
             
         case 'insert':
-            $code[] = '// Werte setzen';
-            foreach ($columns as $column) {
-                $code[] = '$sql->setValue("' . $column . '", $value);';
-            }
             $code[] = '$sql->setTable("' . $table . '");';
-            $code[] = '$sql->insert();';
+            $code[] = '';
+            $code[] = '// Werte setzen';
+            if ($columns) {
+                foreach ($columns as $column) {
+                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
+                }
+            } else {
+                $code[] = '// Beispiel:';
+                $code[] = '// $sql->setValue("name", $name);';
+                $code[] = '// $sql->setValue("description", $description);';
+            }
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->insert();';
+            $code[] = '    $lastId = $sql->getLastId(); // ID des neuen Datensatzes';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
             break;
             
         case 'update':
-            $code[] = '// Werte setzen';
-            foreach ($columns as $column) {
-                $code[] = '$sql->setValue("' . $column . '", $value);';
-            }
             $code[] = '$sql->setTable("' . $table . '");';
-            $code[] = '// WHERE Bedingung nicht vergessen!';
-            $code[] = '$sql->setWhere("id = :id", ["id" => $id]);';
-            $code[] = '$sql->update();';
+            $code[] = '';
+            $code[] = '// Werte setzen';
+            if ($columns) {
+                foreach ($columns as $column) {
+                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
+                }
+            } else {
+                $code[] = '// Beispiel:';
+                $code[] = '// $sql->setValue("name", $name);';
+                $code[] = '// $sql->setValue("description", $description);';
+            }
+            
+            // WHERE conditions for update
+            if (!empty($where['column'])) {
+                $whereConditions = [];
+                $whereParams = [];
+                foreach ($where['column'] as $i => $column) {
+                    if ($column && isset($where['operator'][$i])) {
+                        $operator = $where['operator'][$i];
+                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
+                            $whereConditions[] = $column . ' ' . $operator;
+                        } else {
+                            $paramName = 'where_' . $i;
+                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
+                            $whereParams[$paramName] = $where['value'][$i];
+                        }
+                    }
+                }
+                if ($whereConditions) {
+                    $code[] = '';
+                    $code[] = '// WHERE Bedingung setzen';
+                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
+                }
+            } else {
+                $code[] = '';
+                $code[] = '// WHERE Bedingung nicht vergessen!';
+                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
+            }
+            
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->update();';
+            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der aktualisierten Datensätze';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
             break;
             
         case 'delete':
             $code[] = '$sql->setTable("' . $table . '");';
-            $code[] = '// WHERE Bedingung nicht vergessen!';
-            $code[] = '$sql->setWhere("id = :id", ["id" => $id]);';
-            $code[] = '$sql->delete();';
+            
+            // WHERE conditions for delete
+            if (!empty($where['column'])) {
+                $whereConditions = [];
+                $whereParams = [];
+                foreach ($where['column'] as $i => $column) {
+                    if ($column && isset($where['operator'][$i])) {
+                        $operator = $where['operator'][$i];
+                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
+                            $whereConditions[] = $column . ' ' . $operator;
+                        } else {
+                            $paramName = 'where_' . $i;
+                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
+                            $whereParams[$paramName] = $where['value'][$i];
+                        }
+                    }
+                }
+                if ($whereConditions) {
+                    $code[] = '';
+                    $code[] = '// WHERE Bedingung setzen';
+                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
+                }
+            } else {
+                $code[] = '';
+                $code[] = '// WHERE Bedingung nicht vergessen!';
+                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
+            }
+            
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->delete();';
+            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der gelöschten Datensätze';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
             break;
     }
     
