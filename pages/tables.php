@@ -34,15 +34,6 @@ $listQuery = 'SELECT
 
 $list = rex_list::factory($listQuery);
 
-// Hide some columns by default
-$list->removeColumn('create_time');
-$list->removeColumn('update_time');
-$list->removeColumn('is_core');
-
-// Search settings
-$list->setColumnParams('table_name', ['table' => '###table_name###']);
-$list->addParam('start', rex_request('start', 'int', null));
-
 // Format table name
 $list->setColumnFormat('table_name', 'custom', function ($params) use ($coreTables) {
     $tableName = $params['value'];
@@ -62,48 +53,13 @@ $list->setColumnFormat('table_rows', 'custom', function ($params) {
 });
 
 // Column labels
-$list->setColumnLabel('table_name', rex_i18n::msg('table'));
-$list->setColumnLabel('table_rows', rex_i18n::msg('rows'));
-$list->setColumnLabel('create_time', rex_i18n::msg('created_at'));
-$list->setColumnLabel('update_time', rex_i18n::msg('updated_at'));
-
-// Sortable columns
-$list->setColumnSortable('table_name');
-$list->setColumnSortable('table_rows');
-$list->setColumnSortable('create_time');
-$list->setColumnSortable('update_time');
-
-// Add show/hide columns button
-$columnSelect = [];
-$columnSelect['create_time'] = rex_i18n::msg('created_at');
-$columnSelect['update_time'] = rex_i18n::msg('updated_at');
-
-$toolbar = '
-    <div class="btn-group btn-group-xs">
-        <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-            <i class="rex-icon fa-th-list"></i>
-            Spalten
-            <span class="caret"></span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-right">';
-
-foreach ($columnSelect as $id => $title) {
-    $toolbar .= '<li>
-        <a href="'.rex_url::currentBackendPage(['list' => 'tables', 'func' => 'toggle_column', 'column' => $id]).'">
-            <i class="rex-icon '.($list->getColumnStatus($id) ? 'fa-check-square-o' : 'fa-square-o').'"></i>
-            '.$title.'
-        </a>
-    </li>';
-}
-
-$toolbar .= '
-        </ul>
-    </div>';
+$list->setColumnLabel('table_name', 'Tabellenname');
+$list->setColumnLabel('table_rows', 'Datensätze');
+$list->setColumnLabel('create_time', 'Erstellt am');
+$list->setColumnLabel('update_time', 'Geändert am');
 
 // Actions
 $list->addColumn('actions', '<i class="rex-icon fa-cog"></i>', -1, ['<th class="rex-table-action">###VALUE###</th>', '<td class="rex-table-action">###VALUE###</td>']);
-$list->setColumnParams('actions', ['page' => 'table_builder/edit', 'table' => '###table_name###']);
-$list->addLinkAttribute('actions', 'class', 'btn btn-xs btn-default');
 $list->setColumnFormat('actions', 'custom', function ($params) {
     $tableName = $params['list']->getValue('table_name');
     
@@ -129,12 +85,14 @@ $content .= '
     font-size: 10px;
     vertical-align: middle;
 }
+.table > tbody > tr > td {
+    vertical-align: middle;
+}
 </style>';
 
-// Add table toolbar
+// Add table section with create button
 $fragment = new rex_fragment();
 $fragment->setVar('title', 'Tabellen');
-$fragment->setVar('options', $toolbar, false);
 $fragment->setVar('content', $list->get(), false);
 $content .= $fragment->parse('core/page/section.php');
 
