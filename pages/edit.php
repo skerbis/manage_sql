@@ -144,11 +144,11 @@ $formContent .= '</select>
                     <div class="form-group">
                         <label>Extra:</label>
                         <select name="columns['.$name.'][extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
-                        $formContent .= '<option value="">-- Bitte wählen --</option>';
-                        foreach ($extraOptions as $option) {
-                            $selected = ($column->getExtra() == $option) ? 'selected' : '';
-                            $formContent .= '<option value="' . rex_escape($option) . '" '.$selected.'>' . rex_escape($option) . '</option>';
-                        }
+        $formContent .= '<option value="">-- Bitte wählen --</option>';
+        foreach ($extraOptions as $option) {
+            $selected = ($column->getExtra() == $option) ? 'selected' : '';
+            $formContent .= '<option value="' . rex_escape($option) . '" '.$selected.'>' . rex_escape($option) . '</option>';
+        }
         $formContent .= '</select>
                     </div>
                 </div>
@@ -198,10 +198,10 @@ $newColumnForm .= '</select>
                     <div class="form-group">
                         <label>Extra:</label>
                         <select name="new_column[extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
-                        $formContent .= '<option value="">-- Bitte wählen --</option>';
-                        foreach ($extraOptions as $option) {
-                            $newColumnForm .= '<option value="' . rex_escape($option) . '">' . rex_escape($option) . '</option>';
-                        }
+        $newColumnForm .= '<option value="">-- Bitte wählen --</option>';
+        foreach ($extraOptions as $option) {
+            $newColumnForm .= '<option value="' . rex_escape($option) . '">' . rex_escape($option) . '</option>';
+        }
         $newColumnForm .= '</select>
                     </div>
                 </div>
