@@ -103,11 +103,9 @@ if ($dbType === 'mysql') {
 
 // Existing columns
 $columns = $table->getColumns();
-$i = 0; // Zähler für unique IDs
 foreach ($columns as $column) {
     $name = $column->getName();
     if ($name === 'id') continue; // Skip id column
-    $datalistId = 'extra_options_existing_' . $i; // Eindeutige ID
 
     $formContent .= '<div class="column-row panel panel-default">
         <div class="panel-heading">
@@ -145,12 +143,13 @@ $formContent .= '</select>
                 <div class="col-sm-3">
                     <div class="form-group">
                         <label>Extra:</label>
-                        <input type="text" name="columns['.$name.'][extra]" value="'.rex_escape($column->getExtra()).'" class="form-control" list="'.$datalistId.'">
-                        <datalist id="'.$datalistId.'">';
-                         foreach ($extraOptions as $option) {
-                            $formContent .= '<option value="' . rex_escape($option) . '">';
-                         }
-        $formContent .= '</datalist>
+                        <select name="columns['.$name.'][extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
+                        $formContent .= '<option value="">-- Bitte wählen --</option>';
+                        foreach ($extraOptions as $option) {
+                            $selected = ($column->getExtra() == $option) ? 'selected' : '';
+                            $formContent .= '<option value="' . rex_escape($option) . '" '.$selected.'>' . rex_escape($option) . '</option>';
+                        }
+        $formContent .= '</select>
                     </div>
                 </div>
                 <div class="col-sm-2">
@@ -164,7 +163,6 @@ $formContent .= '</select>
             </div>
         </div>
     </div>';
-    $i++;
 }
 
 // New column form
@@ -199,12 +197,12 @@ $newColumnForm .= '</select>
              <div class="col-sm-2">
                     <div class="form-group">
                         <label>Extra:</label>
-                        <input type="text" name="new_column[extra]" class="form-control" placeholder="Extra" list="extra_options_new">
-                        <datalist id="extra_options_new">';
-                         foreach ($extraOptions as $option) {
-                            $newColumnForm .= '<option value="' . rex_escape($option) . '">';
-                         }
-        $newColumnForm .= '</datalist>
+                        <select name="new_column[extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
+                        $formContent .= '<option value="">-- Bitte wählen --</option>';
+                        foreach ($extraOptions as $option) {
+                            $newColumnForm .= '<option value="' . rex_escape($option) . '">' . rex_escape($option) . '</option>';
+                        }
+        $newColumnForm .= '</select>
                     </div>
                 </div>
             <div class="col-sm-2">
@@ -239,57 +237,4 @@ $fragment->setVar('body', '
 
 $content .= $fragment->parse('core/page/section.php');
 
-echo $content;?>
-<style>
-/* Grundeinstellungen für datalist */
-datalist {
-  display: block; /* Stelle sicher, dass sie ein Blockelement ist */
-  position: absolute;  /*  Wichtig für die Positionierung */
-  z-index: 10; /* Stell sicher, dass sie über anderen Elementen liegt */
-  background-color: white;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  width: calc(100% - 2px); /* Breite anpassen, abzüglich der Border */
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 0; /* Wichtig: Entferne Standard-Padding */
-  margin: 0; /* Wichtig: Entferne Standard-Margin */
-  list-style: none; /* Entferne Aufzählungszeichen */
-  box-sizing: border-box; /* Stell sicher, dass padding/border in width einbezogen werden */
-}
-
-/* Style die Options (optional) */
-datalist option {
-  padding: 5px 10px;
-  cursor: pointer;
-  white-space: nowrap; /* Verhindere Zeilenumbrüche */
-}
-
-datalist option:hover {
-  background-color: #f0f0f0;
-}
-
-/* WICHTIG: Spezifisches Styling für das Input-Feld, um die Datalist auszulösen */
-input[list] {
-  -webkit-appearance: none; /* Deaktiviere Standard-Safari-Styling */
-  /* Zusätzliche Styles für das Input-Feld nach Bedarf */
-}
-
-input[list]::-webkit-calendar-picker-indicator {
-  display: none; /* Optional: Entferne den Kalender-Indikator, falls vorhanden */
-}
-
-/* Optional:  Ein Pfeil-Symbol im Input-Feld */
-input[list] {
-  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 11L3 6H13L8 11Z' fill='%23444444'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 10px;
-  padding-right: 25px; /* Platz für den Pfeil schaffen */
-}
-
-/* Wichtig: Korrekte Positionierung der Datalist relativ zum Input */
-.form-group {
-  position: relative; /* Stelle sicher, dass das umgebende Element positioniert ist */
-}
-</style>
+echo $content;
