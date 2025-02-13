@@ -4,10 +4,8 @@ author: Your Name
 supportpage: https://github.com/your/repo
 
 requires:
-    php:
-        version: '>=8.1'
-    redaxo:
-        version: '>=5.18.1'
+    php: '>=8.1'
+    redaxo: '>=5.18.1'
 
 page:
     title: 'Table Builder'
