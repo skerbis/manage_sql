@@ -18,19 +18,19 @@ if (!$table->exists()) {
 // Handle form submission
 if (rex_post('updatetable', 'boolean')) {
     $columns = rex_post('columns', 'array');
-
+    
     try {
         // Start transaction
         $sql = rex_sql::factory();
         $sql->beginTransaction();
-
+        
         foreach ($columns as $columnName => $column) {
             if (isset($column['delete']) && $column['delete']) {
                 // Delete column
                 $table->removeColumn($columnName);
                 continue;
             }
-
+            
             // Update or add column
             $table->ensureColumn(new rex_sql_column(
                 $columnName,
@@ -41,7 +41,7 @@ if (rex_post('updatetable', 'boolean')) {
                 $column['comment'] ?? null
             ));
         }
-
+        
         // Add new column if data exists
         if ($newColumn = rex_post('new_column', 'array')) {
             if (!empty($newColumn['name']) && !empty($newColumn['type'])) {
@@ -55,16 +55,16 @@ if (rex_post('updatetable', 'boolean')) {
                 ));
             }
         }
-
+        
         // Save changes
         $table->ensure();
         $sql->commit();
-
+        
         $message = 'Tabelle wurde erfolgreich aktualisiert.';
-
+        
         // Regenerate table object to get fresh data
         $table = rex_sql_table::get($tableName);
-
+        
     } catch (Exception $e) {
         $sql->rollBack();
         $error = $e->getMessage();
@@ -82,31 +82,12 @@ if ($message) {
 // Build form
 $formContent = '';
 
-// Datenbanktyp abrufen
-$dbType = rex::getProperty('dbtype'); // Annahme, dass rex diese Info bereitstellt
-
-// Vorschläge basierend auf dem Datenbanktyp definieren
-$extraOptions = [];
-
-if ($dbType === 'mysql') {
-    $extraOptions = [
-        'auto_increment',
-        'on update CURRENT_TIMESTAMP',
-        'GENERATED ALWAYS AS (...) STORED',
-        'GENERATED ALWAYS AS (...) VIRTUAL',
-    ];
-} elseif ($dbType === 'pgsql') {
-    $extraOptions = [
-        'GENERATED ALWAYS AS (...) STORED', // Beispiel für PostgreSQL
-    ];
-}
-
 // Existing columns
 $columns = $table->getColumns();
 foreach ($columns as $column) {
     $name = $column->getName();
     if ($name === 'id') continue; // Skip id column
-
+    
     $formContent .= '<div class="column-row panel panel-default">
         <div class="panel-heading">
             <div class="row">
@@ -126,7 +107,7 @@ foreach ($columns as $column) {
                     <div class="form-group">
                         <label>Typ:</label>
                         <select name="columns['.$name.'][type]" class="form-control">';
-
+                        
 foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
     $formContent .= '<option value="'.$type.'"'.($column->getType() === $type ? ' selected' : '').'>'.$label.'</option>';
 }
@@ -137,19 +118,13 @@ $formContent .= '</select>
                 <div class="col-sm-3">
                     <div class="form-group">
                         <label>Standardwert:</label>
-                        <input type="text" name="columns['.$name.'][default]" value="'.rex_escape($column->getDefault()).'" class="form-control">
+                        <input type="text" name="columns['.$name.'][default]" value="'.$column->getDefault().'" class="form-control">
                     </div>
                 </div>
                 <div class="col-sm-3">
                     <div class="form-group">
                         <label>Extra:</label>
-                        <select name="columns['.$name.'][extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
-        $formContent .= '<option value="">-- Bitte wählen --</option>';
-        foreach ($extraOptions as $option) {
-            $selected = ($column->getExtra() == $option) ? 'selected' : '';
-            $formContent .= '<option value="' . rex_escape($option) . '" '.$selected.'>' . rex_escape($option) . '</option>';
-        }
-        $formContent .= '</select>
+                        <input type="text" name="columns['.$name.'][extra]" value="'.$column->getExtra().'" class="form-control">
                     </div>
                 </div>
                 <div class="col-sm-2">
@@ -194,17 +169,6 @@ $newColumnForm .= '</select>
                     <input type="text" name="new_column[default]" class="form-control" placeholder="Standardwert">
                 </div>
             </div>
-             <div class="col-sm-2">
-                    <div class="form-group">
-                        <label>Extra:</label>
-                        <select name="new_column[extra]" class="form-control selectpicker" data-live-search="true" data-width="100%">';
-        $newColumnForm .= '<option value="">-- Bitte wählen --</option>';
-        foreach ($extraOptions as $option) {
-            $newColumnForm .= '<option value="' . rex_escape($option) . '">' . rex_escape($option) . '</option>';
-        }
-        $newColumnForm .= '</select>
-                    </div>
-                </div>
             <div class="col-sm-2">
                 <div class="checkbox">
                     <label>
