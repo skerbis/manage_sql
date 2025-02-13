@@ -38,4 +38,3 @@ page:
         beholder:
             title: 'Hausmeister'
             icon: rex-icon fa-edit
-            hidden: true
