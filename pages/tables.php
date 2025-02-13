@@ -23,16 +23,16 @@ $listQuery = 'SELECT
         t.table_rows,
         t.create_time,
         t.update_time,
-        IF(t.table_name IN ("'.implode('","', $coreTables).'"), 1, 0) as is_core
+        CASE WHEN t.table_name IN ("'.implode('","', $coreTables).'") THEN 1 ELSE 0 END as is_core
     FROM 
         information_schema.tables t
     WHERE 
         t.table_schema = DATABASE()
-        AND t.table_name LIKE :prefix
+        AND t.table_name LIKE "rex_%"
     ORDER BY 
         is_core DESC, table_name ASC';
 
-$list = rex_list::factory($listQuery, 30, 'tables', false, ['prefix' => 'rex_%']);
+$list = rex_list::factory($listQuery);
 
 // Hide some columns by default
 $list->removeColumn('create_time');
@@ -58,7 +58,7 @@ $list->setColumnFormat('table_name', 'custom', function ($params) use ($coreTabl
 
 // Format row count
 $list->setColumnFormat('table_rows', 'custom', function ($params) {
-    return number_format($params['value'], 0, ',', '.');
+    return number_format((int)$params['value'], 0, ',', '.');
 });
 
 // Column labels
