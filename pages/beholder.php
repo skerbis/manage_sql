@@ -73,7 +73,7 @@ if ($selectedTable) {
         // Bestimme den Feldtyp basierend auf dem Spaltentyp
         if (stripos($column['type'], 'enum') !== false || stripos($column['type'], 'set') !== false) {
             // Extrahiere die Enum-/Set-Werte aus dem Typ
-            preg_match('/\((.*?)\)/', $column['type'], $matches');
+            preg_match('/\((.*?)\)/', $column['type'], $matches);
             $values = explode(',', str_replace("'", '', $matches[1])); // Werte extrahieren und bereinigen
 
             $filterForm .= '<select class="form-control" id="filter_' . $column['name'] . '" name="filter[' . $column['name'] . ']">';
