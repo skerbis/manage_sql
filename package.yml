@@ -10,20 +10,27 @@ requires:
 page:
     title: 'Table Builder'
     perm: admin
-    subpages:
-        tables:
-            title: 'Tabellen'
-            icon: rex-icon fa-table
-        create:
-            title: 'Neue Tabelle'
-            icon: rex-icon fa-plus
-            itemclass: pull-right
-            perm: admin
-        sql:
-            title: 'SQL Export'
-            icon: rex-icon fa-code
-            itemclass: pull-right
-            perm: admin
+    icon: rex-icon fa-table
+
+pages:
+    tables:
+        title: 'Tabellen'
+        icon: rex-icon fa-table
+        path: pages/tables.php
+    create:
+        title: 'Neue Tabelle'
+        icon: rex-icon fa-plus
+        itemclass: pull-right
+        path: pages/create.php
+    sql:
+        title: 'SQL Export'
+        icon: rex-icon fa-code
+        itemclass: pull-right
+        path: pages/sql.php
+    edit:
+        title: 'Tabelle bearbeiten'
+        path: pages/edit.php
+        hidden: true
 
 default_config:
     table_prefix: 'rex_'
