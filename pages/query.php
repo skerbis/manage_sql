@@ -1,10 +1,11 @@
 <?php
+
 $content = '';
 
 // Get all tables
 $sql = rex_sql::factory();
 $tables = $sql->getTablesAndViews();
-$tables = array_filter($tables, function($table) {
+$tables = array_filter($tables, function ($table) {
     return str_starts_with($table, 'rex_');
 });
 
@@ -16,21 +17,21 @@ if ($selectedTable && in_array($selectedTable, $tables)) {
 }
 
 // Handle form submission
-if (rex_post('generate', 'boolean')) {
+if (rex_post('generate', 'boolean') || rex_post('test_query', 'boolean')) {
     $queryType = rex_post('query_type', 'string');
     $selectedColumns = rex_post('columns', 'array', []);
     $whereColumns = rex_post('where', 'array', []);
     $orderBy = rex_post('orderby', 'array', []);
     $limit = rex_post('limit', 'int', 0);
-    
+
     // Generate code
     $code = generateQueryCode($selectedTable, $queryType, $selectedColumns, $whereColumns, $orderBy, $limit);
-    
+
     // Show generated code
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Generierter Code');
     $fragment->setVar('body', '
-        <pre class="pre-scrollable"><code>'.rex_escape($code).'</code></pre>
+        <pre class="pre-scrollable"><code>' . rex_escape($code) . '</code></pre>
         <button class="btn btn-default" onclick="copyToClipboard()">
             <i class="rex-icon fa-copy"></i> In Zwischenablage kopieren
         </button>
@@ -44,11 +45,56 @@ if (rex_post('generate', 'boolean')) {
         </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
+
+    // Test query if requested
+    if (rex_post('test_query', 'boolean') && $queryType === 'select') {
+        $sql = rex_sql::factory();
+        try {
+            // Build query based on the generated code
+            $queryData = buildQuery($selectedTable, $queryType, $selectedColumns, $whereColumns, $orderBy, $limit);
+
+            $query = $queryData['query'];
+            $params = $queryData['params'];
+            $sql->setQuery($query, $params);
+
+            $result = $sql->getArray();
+        } catch (rex_sql_exception $e) {
+            $result = 'Fehler: ' . $e->getMessage();
+        }
+
+        // Show dump result
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', 'Query Ergebnis');
+        $fragment->setVar('body', '<pre class="pre-scrollable">' . rex_escape(print_r($result, true)) . '</pre>', false);
+        $content .= $fragment->parse('core/page/section.php');
+    }
+        // Test query if requested
+    if (rex_post('test_query', 'boolean') && $queryType === 'count') {
+        $sql = rex_sql::factory();
+        try {
+            // Build query based on the generated code
+            $queryData = buildQuery($selectedTable, $queryType, $selectedColumns, $whereColumns, $orderBy, $limit);
+
+            $query = $queryData['query'];
+            $params = $queryData['params'];
+            $sql->setQuery($query, $params);
+
+            $result = $sql->getValue('count');
+        } catch (rex_sql_exception $e) {
+            $result = 'Fehler: ' . $e->getMessage();
+        }
+
+        // Show dump result
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', 'Query Ergebnis');
+        $fragment->setVar('body', '<pre class="pre-scrollable">' . rex_escape(print_r($result, true)) . '</pre>', false);
+        $content .= $fragment->parse('core/page/section.php');
+    }
 }
 
 // Build form
 $formContent = '
-<form id="querybuilder" action="'.rex_url::currentBackendPage().'" method="get">
+<form id="querybuilder" action="' . rex_url::currentBackendPage() . '" method="get">
     <input type="hidden" name="page" value="table_builder/query">
     <div class="row">
         <div class="col-sm-6">
@@ -57,7 +103,7 @@ $formContent = '
                 <select name="table" id="table" class="form-control" onchange="this.form.submit()">
                     <option value="">Bitte wählen...</option>';
 foreach ($tables as $table) {
-    $formContent .= '<option value="'.$table.'"'.($selectedTable === $table ? ' selected' : '').'>'.$table.'</option>';
+    $formContent .= '<option value="' . $table . '"' . ($selectedTable === $table ? ' selected' : '') . '>' . $table . '</option>';
 }
 $formContent .= '
                 </select>
@@ -68,7 +114,7 @@ $formContent .= '
 
 if ($selectedTable && !empty($columns)) {
     $formContent .= '
-    <form action="'.rex_url::currentBackendPage(['table' => $selectedTable]).'" method="post">
+    <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
         <div class="col-sm-6">
             <div class="form-group">
                 <label for="query_type">Query Typ</label>
@@ -99,8 +145,8 @@ if ($selectedTable && !empty($columns)) {
         $formContent .= '
                     <div class="col-sm-3">
                         <label class="checkbox-inline">
-                            <input type="checkbox" name="columns[]" value="'.$column['name'].'" checked class="column-checkbox">
-                            '.$column['name'].'
+                            <input type="checkbox" name="columns[]" value="' . $column['name'] . '" checked class="column-checkbox">
+                            ' . $column['name'] . '
                         </label>
                     </div>';
     }
@@ -118,7 +164,7 @@ if ($selectedTable && !empty($columns)) {
                         <select name="where[column][]" class="form-control">
                             <option value="">Spalte wählen...</option>';
     foreach ($columns as $column) {
-        $formContent .= '<option value="'.$column['name'].'">'.$column['name'].'</option>';
+        $formContent .= '<option value="' . $column['name'] . '">' . $column['name'] . '</option>';
     }
     $formContent .= '
                         </select>
@@ -163,7 +209,7 @@ if ($selectedTable && !empty($columns)) {
                         <select name="orderby[column][]" class="form-control">
                             <option value="">Spalte wählen...</option>';
     foreach ($columns as $column) {
-        $formContent .= '<option value="'.$column['name'].'">'.$column['name'].'</option>';
+        $formContent .= '<option value="' . $column['name'] . '">' . $column['name'] . '</option>';
     }
     $formContent .= '
                         </select>
@@ -195,6 +241,7 @@ if ($selectedTable && !empty($columns)) {
         
         <div class="panel-footer">
             <button type="submit" name="generate" value="1" class="btn btn-save">Code generieren</button>
+            <button type="submit" name="test_query" value="1" class="btn btn-primary">Query testen</button>
         </div>
     </form>';
 }
@@ -290,21 +337,177 @@ echo $content;
 /**
  * Generate rex_sql code
  */
-function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limit) {
+function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limit)
+{
     $code = [];
-    $code[] = '// Rex SQL Query für '.$table;
+    $code[] = '// Rex SQL Query für ' . $table;
     $code[] = '$sql = rex_sql::factory();';
+
+    switch ($queryType) {
+        case 'select':
+            $queryData = buildQuery($table, $queryType, $columns, $where, $orderBy, $limit);
+
+            $query = $queryData['query'];
+            $params = $queryData['params'];
+
+            $code[] = '// Query ausführen';
+            $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
+            $code[] = '';
+            $code[] = '// Beispiele für Datenzugriff:';
+            $code[] = '// Alle Datensätze als Array';
+            $code[] = '$data = $sql->getArray();';
+            $code[] = '';
+            $code[] = '// Einzelner Datensatz';
+            $code[] = '$sql->getRow();';
+            $code[] = '$value = $sql->getValue("spaltenname");';
+            break;
+         case 'count':
+            $queryData = buildQuery($table, $queryType, $columns, $where, $orderBy, $limit);
+
+            $query = $queryData['query'];
+            $params = $queryData['params'];
+
+            $code[] = '// Query ausführen';
+            $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
+            $code[] = '';
+            $code[] = '// Beispiele für Datenzugriff:';
+            $code[] = '// Wert';
+            $code[] = '$value = $sql->getValue();';
+            break;
+
+        case 'insert':
+            $code[] = '$sql->setTable("' . $table . '");';
+            $code[] = '';
+            $code[] = '// Werte setzen';
+            if ($columns) {
+                foreach ($columns as $column) {
+                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
+                }
+            } else {
+                $code[] = '// Beispiel:';
+                $code[] = '// $sql->setValue("name", $name);';
+                $code[] = '// $sql->setValue("description", $description);';
+            }
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->insert();';
+            $code[] = '    $lastId = $sql->getLastId(); // ID des neuen Datensatzes';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
+            break;
+
+        case 'update':
+            $code[] = '$sql->setTable("' . $table . '");';
+            $code[] = '';
+            $code[] = '// Werte setzen';
+            if ($columns) {
+                foreach ($columns as $column) {
+                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
+                }
+            } else {
+                $code[] = '// Beispiel:';
+                $code[] = '// $sql->setValue("name", $name);';
+                $code[] = '// $sql->setValue("description", $description);';
+            }
+
+            // WHERE conditions for update
+            if (!empty($where['column'])) {
+                $whereConditions = [];
+                $whereParams = [];
+                foreach ($where['column'] as $i => $column) {
+                    if ($column && isset($where['operator'][$i])) {
+                        $operator = $where['operator'][$i];
+                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
+                            $whereConditions[] = $column . ' ' . $operator;
+                        } else {
+                            $paramName = 'where_' . $i;
+                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
+                            $whereParams[$paramName] = $where['value'][$i];
+                        }
+                    }
+                }
+                if ($whereConditions) {
+                    $code[] = '';
+                    $code[] = '// WHERE Bedingung setzen';
+                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
+                }
+            } else {
+                $code[] = '';
+                $code[] = '// WHERE Bedingung nicht vergessen!';
+                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
+            }
+
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->update();';
+            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der aktualisierten Datensätze';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
+            break;
+
+        case 'delete':
+            $code[] = '$sql->setTable("' . $table . '");';
+
+            // WHERE conditions for delete
+            if (!empty($where['column'])) {
+                $whereConditions = [];
+                $whereParams = [];
+                foreach ($where['column'] as $i => $column) {
+                    if ($column && isset($where['operator'][$i])) {
+                        $operator = $where['operator'][$i];
+                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
+                            $whereConditions[] = $column . ' ' . $operator;
+                        } else {
+                            $paramName = 'where_' . $i;
+                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
+                            $whereParams[$paramName] = $where['value'][$i];
+                        }
+                    }
+                }
+                if ($whereConditions) {
+                    $code[] = '';
+                    $code[] = '// WHERE Bedingung setzen';
+                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
+                }
+            } else {
+                $code[] = '';
+                $code[] = '// WHERE Bedingung nicht vergessen!';
+                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
+            }
+
+            $code[] = '';
+            $code[] = 'try {';
+            $code[] = '    $sql->delete();';
+            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der gelöschten Datensätze';
+            $code[] = '} catch (rex_sql_exception $e) {';
+            $code[] = '    // Fehlerbehandlung';
+            $code[] = '    echo $e->getMessage();';
+            $code[] = '}';
+            break;
+    }
+
+    return implode("\n", $code);
+}
+
+
+/**
+ * Build query and params
+ */
+function buildQuery($table, $queryType, $columns, $where, $orderBy, $limit) {
+    $params = [];
     
     switch ($queryType) {
         case 'select':
-            $conditions = [];
-            $params = [];
-            
             // Handle SELECT columns
             $selectAll = rex_post('select_all', 'boolean');
             $columnList = $selectAll ? '*' : ($columns ? implode(', ', $columns) : '*');
             
             // Build WHERE conditions
+            $conditions = [];
             if (!empty($where['column'])) {
                 foreach ($where['column'] as $i => $column) {
                     if ($column && isset($where['operator'][$i])) {
@@ -346,22 +549,10 @@ function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limi
                 $query .= "\nLIMIT " . $limit;
             }
             
-            $code[] = '// Query ausführen';
-            $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
-            $code[] = '';
-            $code[] = '// Beispiele für Datenzugriff:';
-            $code[] = '// Alle Datensätze als Array';
-            $code[] = '$data = $sql->getArray();';
-            $code[] = '';
-            $code[] = '// Einzelner Datensatz';
-            $code[] = '$sql->getRow();'; 
-            $code[] = '$value = $sql->getValue("spaltenname");';
-            break;
-            
-        case 'count':
+            return ['query' => $query, 'params' => $params];
+             case 'count':
+            // Build WHERE conditions
             $conditions = [];
-            $params = [];
-            
             if (!empty($where['column'])) {
                 foreach ($where['column'] as $i => $column) {
                     if ($column && isset($where['operator'][$i])) {
@@ -382,124 +573,9 @@ function generateQueryCode($table, $queryType, $columns, $where, $orderBy, $limi
                 $query .= "\nWHERE " . implode(' AND ', $conditions);
             }
             
-            $code[] = '$sql->setQuery("' . $query . '", ' . (empty($params) ? '[]' : var_export($params, true)) . ');';
-            $code[] = '$count = $sql->getValue("count");';
-            break;
+            return ['query' => $query, 'params' => $params];
             
-        case 'insert':
-            $code[] = '$sql->setTable("' . $table . '");';
-            $code[] = '';
-            $code[] = '// Werte setzen';
-            if ($columns) {
-                foreach ($columns as $column) {
-                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
-                }
-            } else {
-                $code[] = '// Beispiel:';
-                $code[] = '// $sql->setValue("name", $name);';
-                $code[] = '// $sql->setValue("description", $description);';
-            }
-            $code[] = '';
-            $code[] = 'try {';
-            $code[] = '    $sql->insert();';
-            $code[] = '    $lastId = $sql->getLastId(); // ID des neuen Datensatzes';
-            $code[] = '} catch (rex_sql_exception $e) {';
-            $code[] = '    // Fehlerbehandlung';
-            $code[] = '    echo $e->getMessage();';
-            $code[] = '}';
-            break;
-            
-        case 'update':
-            $code[] = '$sql->setTable("' . $table . '");';
-            $code[] = '';
-            $code[] = '// Werte setzen';
-            if ($columns) {
-                foreach ($columns as $column) {
-                    $code[] = '$sql->setValue("' . $column . '", $' . $column . '); // Wert für ' . $column;
-                }
-            } else {
-                $code[] = '// Beispiel:';
-                $code[] = '// $sql->setValue("name", $name);';
-                $code[] = '// $sql->setValue("description", $description);';
-            }
-            
-            // WHERE conditions for update
-            if (!empty($where['column'])) {
-                $whereConditions = [];
-                $whereParams = [];
-                foreach ($where['column'] as $i => $column) {
-                    if ($column && isset($where['operator'][$i])) {
-                        $operator = $where['operator'][$i];
-                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
-                            $whereConditions[] = $column . ' ' . $operator;
-                        } else {
-                            $paramName = 'where_' . $i;
-                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
-                            $whereParams[$paramName] = $where['value'][$i];
-                        }
-                    }
-                }
-                if ($whereConditions) {
-                    $code[] = '';
-                    $code[] = '// WHERE Bedingung setzen';
-                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
-                }
-            } else {
-                $code[] = '';
-                $code[] = '// WHERE Bedingung nicht vergessen!';
-                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
-            }
-            
-            $code[] = '';
-            $code[] = 'try {';
-            $code[] = '    $sql->update();';
-            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der aktualisierten Datensätze';
-            $code[] = '} catch (rex_sql_exception $e) {';
-            $code[] = '    // Fehlerbehandlung';
-            $code[] = '    echo $e->getMessage();';
-            $code[] = '}';
-            break;
-            
-        case 'delete':
-            $code[] = '$sql->setTable("' . $table . '");';
-            
-            // WHERE conditions for delete
-            if (!empty($where['column'])) {
-                $whereConditions = [];
-                $whereParams = [];
-                foreach ($where['column'] as $i => $column) {
-                    if ($column && isset($where['operator'][$i])) {
-                        $operator = $where['operator'][$i];
-                        if (in_array($operator, ['IS NULL', 'IS NOT NULL'])) {
-                            $whereConditions[] = $column . ' ' . $operator;
-                        } else {
-                            $paramName = 'where_' . $i;
-                            $whereConditions[] = $column . ' ' . $operator . ' :' . $paramName;
-                            $whereParams[$paramName] = $where['value'][$i];
-                        }
-                    }
-                }
-                if ($whereConditions) {
-                    $code[] = '';
-                    $code[] = '// WHERE Bedingung setzen';
-                    $code[] = '$sql->setWhere("' . implode(' AND ', $whereConditions) . '", ' . var_export($whereParams, true) . ');';
-                }
-            } else {
-                $code[] = '';
-                $code[] = '// WHERE Bedingung nicht vergessen!';
-                $code[] = '// $sql->setWhere("id = :id", ["id" => $id]);';
-            }
-            
-            $code[] = '';
-            $code[] = 'try {';
-            $code[] = '    $sql->delete();';
-            $code[] = '    $affectedRows = $sql->getRows(); // Anzahl der gelöschten Datensätze';
-            $code[] = '} catch (rex_sql_exception $e) {';
-            $code[] = '    // Fehlerbehandlung';
-            $code[] = '    echo $e->getMessage();';
-            $code[] = '}';
-            break;
+        default:
+            return ['query' => '', 'params' => []];
     }
-    
-    return implode("\n", $code);
 }
