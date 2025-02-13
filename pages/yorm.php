@@ -242,7 +242,7 @@ $fragment->setVar('title', 'YORM Code Generator');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
-echo $content;
+
 
 // Find relations in the fields
     $relations = [];
@@ -395,3 +395,4 @@ echo $content;
         </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
+echo $content;
