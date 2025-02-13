@@ -9,7 +9,7 @@ $tables = array_filter($tables, function($table) {
 });
 
 // Get selected table structure if a table is selected
-$selectedTable = rex_get('table', 'string');
+$selectedTable = rex_request('table', 'string', '');
 $columns = [];
 if ($selectedTable && in_array($selectedTable, $tables)) {
     $columns = rex_sql::showColumns($selectedTable);
@@ -48,7 +48,8 @@ if (rex_post('generate', 'boolean')) {
 
 // Build form
 $formContent = '
-<form action="'.rex_url::currentBackendPage().'" method="post">
+<form id="querybuilder" action="'.rex_url::currentBackendPage().'" method="get">
+    <input type="hidden" name="page" value="table_builder/query">
     <div class="row">
         <div class="col-sm-6">
             <div class="form-group">
@@ -62,6 +63,12 @@ $formContent .= '
                 </select>
             </div>
         </div>
+    </div>
+</form>';
+
+if ($selectedTable && !empty($columns)) {
+    $formContent .= '
+    <form action="'.rex_url::currentBackendPage(['table' => $selectedTable]).'" method="post">
         <div class="col-sm-6">
             <div class="form-group">
                 <label for="query_type">Query Typ</label>
@@ -74,118 +81,115 @@ $formContent .= '
                 </select>
             </div>
         </div>
-    </div>';
-
-if ($selectedTable && !empty($columns)) {
-    $formContent .= '
-    <div class="panel panel-default">
-        <div class="panel-heading">Spalten</div>
-        <div class="panel-body">
-            <div class="row">';
+    
+        <div class="panel panel-default">
+            <div class="panel-heading">Spalten</div>
+            <div class="panel-body">
+                <div class="row">';
     
     foreach ($columns as $column) {
         $formContent .= '
-            <div class="col-sm-3">
-                <label class="checkbox-inline">
-                    <input type="checkbox" name="columns[]" value="'.$column['name'].'" checked>
-                    '.$column['name'].'
-                </label>
-            </div>';
+                <div class="col-sm-3">
+                    <label class="checkbox-inline">
+                        <input type="checkbox" name="columns[]" value="'.$column['name'].'" checked>
+                        '.$column['name'].'
+                    </label>
+                </div>';
     }
     
     $formContent .= '
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div class="panel panel-default">
-        <div class="panel-heading">WHERE Bedingungen</div>
-        <div class="panel-body" id="where-conditions">
-            <div class="where-row row">
-                <div class="col-sm-4">
-                    <select name="where[column][]" class="form-control">
-                        <option value="">Spalte wählen...</option>';
+        
+        <div class="panel panel-default">
+            <div class="panel-heading">WHERE Bedingungen</div>
+            <div class="panel-body" id="where-conditions">
+                <div class="where-row row">
+                    <div class="col-sm-4">
+                        <select name="where[column][]" class="form-control">
+                            <option value="">Spalte wählen...</option>';
     foreach ($columns as $column) {
         $formContent .= '<option value="'.$column['name'].'">'.$column['name'].'</option>';
     }
     $formContent .= '
-                    </select>
-                </div>
-                <div class="col-sm-3">
-                    <select name="where[operator][]" class="form-control">
-                        <option value="=">=</option>
-                        <option value="!=">!=</option>
-                        <option value=">">></option>
-                        <option value=">=">>=</option>
-                        <option value="<"><</option>
-                        <option value="<="><=</option>
-                        <option value="LIKE">LIKE</option>
-                        <option value="IS NULL">IS NULL</option>
-                        <option value="IS NOT NULL">IS NOT NULL</option>
-                    </select>
-                </div>
-                <div class="col-sm-3">
-                    <input type="text" name="where[value][]" class="form-control" placeholder="Wert">
-                </div>
-                <div class="col-sm-2">
-                    <button type="button" class="btn btn-delete" onclick="removeWhereRow(this)">
-                        <i class="rex-icon fa-minus-circle"></i>
-                    </button>
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <select name="where[operator][]" class="form-control">
+                            <option value="=">=</option>
+                            <option value="!=">!=</option>
+                            <option value=">">></option>
+                            <option value=">=">>=</option>
+                            <option value="<"><</option>
+                            <option value="<="><=</option>
+                            <option value="LIKE">LIKE</option>
+                            <option value="IS NULL">IS NULL</option>
+                            <option value="IS NOT NULL">IS NOT NULL</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="text" name="where[value][]" class="form-control" placeholder="Wert">
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-delete" onclick="removeWhereRow(this)">
+                            <i class="rex-icon fa-minus-circle"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
+            <div class="panel-footer">
+                <button type="button" class="btn btn-default" onclick="addWhereRow()">
+                    <i class="rex-icon fa-plus"></i> Weitere Bedingung
+                </button>
+            </div>
         </div>
-        <div class="panel-footer">
-            <button type="button" class="btn btn-default" onclick="addWhereRow()">
-                <i class="rex-icon fa-plus"></i> Weitere Bedingung
-            </button>
-        </div>
-    </div>
-    
-    <div class="panel panel-default">
-        <div class="panel-heading">ORDER BY</div>
-        <div class="panel-body" id="orderby-conditions">
-            <div class="orderby-row row">
-                <div class="col-sm-6">
-                    <select name="orderby[column][]" class="form-control">
-                        <option value="">Spalte wählen...</option>';
+        
+        <div class="panel panel-default">
+            <div class="panel-heading">ORDER BY</div>
+            <div class="panel-body" id="orderby-conditions">
+                <div class="orderby-row row">
+                    <div class="col-sm-6">
+                        <select name="orderby[column][]" class="form-control">
+                            <option value="">Spalte wählen...</option>';
     foreach ($columns as $column) {
         $formContent .= '<option value="'.$column['name'].'">'.$column['name'].'</option>';
     }
     $formContent .= '
-                    </select>
-                </div>
-                <div class="col-sm-4">
-                    <select name="orderby[direction][]" class="form-control">
-                        <option value="ASC">Aufsteigend</option>
-                        <option value="DESC">Absteigend</option>
-                    </select>
-                </div>
-                <div class="col-sm-2">
-                    <button type="button" class="btn btn-delete" onclick="removeOrderByRow(this)">
-                        <i class="rex-icon fa-minus-circle"></i>
-                    </button>
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <select name="orderby[direction][]" class="form-control">
+                            <option value="ASC">Aufsteigend</option>
+                            <option value="DESC">Absteigend</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-delete" onclick="removeOrderByRow(this)">
+                            <i class="rex-icon fa-minus-circle"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
+            <div class="panel-footer">
+                <button type="button" class="btn btn-default" onclick="addOrderByRow()">
+                    <i class="rex-icon fa-plus"></i> Weitere Sortierung
+                </button>
+            </div>
         </div>
+        
+        <div class="form-group">
+            <label for="limit">LIMIT</label>
+            <input type="number" name="limit" id="limit" class="form-control" min="0">
+        </div>
+        
         <div class="panel-footer">
-            <button type="button" class="btn btn-default" onclick="addOrderByRow()">
-                <i class="rex-icon fa-plus"></i> Weitere Sortierung
-            </button>
+            <button type="submit" name="generate" value="1" class="btn btn-save">Code generieren</button>
         </div>
-    </div>
-    
-    <div class="form-group">
-        <label for="limit">LIMIT</label>
-        <input type="number" name="limit" id="limit" class="form-control" min="0">
-    </div>
-    
-    <div class="panel-footer">
-        <button type="submit" name="generate" value="1" class="btn btn-save">Code generieren</button>
-    </div>';
+    </form>';
 }
 
-$formContent .= '</form>
-
+$formContent .= '
 <script>
 function addWhereRow() {
     const container = document.getElementById("where-conditions");
