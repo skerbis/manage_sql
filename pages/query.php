@@ -65,7 +65,7 @@ if (rex_post('generate', 'boolean') || rex_post('test_query', 'boolean')) {
         // Show dump result
         $fragment = new rex_fragment();
         $fragment->setVar('title', 'Query Ergebnis');
-        $fragment->setVar('body', '<pre class="pre-scrollable">' . rex_escape(print_r($result, true)) . '</pre>', false);
+        $fragment->setVar('body', dump($result), false);
         $content .= $fragment->parse('core/page/section.php');
     }
         // Test query if requested
