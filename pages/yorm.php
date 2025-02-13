@@ -107,7 +107,7 @@ if ($selectedTable && !empty($columns)) {
         }
     }
     
-    // Generate static finder methods
+    // Add standard methods
     $modelCode[] = '    /**';
     $modelCode[] = '     * @return rex_yform_manager_collection|' . $className . '[]';
     $modelCode[] = '     */';
@@ -133,7 +133,7 @@ if ($selectedTable && !empty($columns)) {
         <div class="alert alert-info">
             Speichern Sie diesen Code als <code>' . $className . '.php</code>
         </div>
-        <pre class="pre-scrollable"><code class="php">'.rex_escape(implode("\n", $modelCode)).'</code></pre>
+        <pre id="model-code" class="pre-scrollable"><code class="php">'.rex_escape(implode("\n", $modelCode)).'</code></pre>
         <button class="btn btn-default" onclick="copyModelCode()">
             <i class="rex-icon fa-copy"></i> Model-Code kopieren
         </button>
@@ -175,7 +175,7 @@ if ($selectedTable && !empty($columns)) {
     $editCode[] = 'if ($dataset) {';
     $editCode[] = '    // YForm Objekt erstellen';
     $editCode[] = '    $yform = $dataset->getForm();';
-    $editCode[] = '    ';
+    $editCode[] = '';
     $editCode[] = '    // Formular konfigurieren';
     $editCode[] = '    $yform->setObjectparams(\'form_action\', rex_getUrl(REX_ARTICLE_ID));';
     $editCode[] = '    $yform->setObjectparams(\'form_showformafterupdate\', false);';
@@ -243,3 +243,155 @@ $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
 echo $content;
+
+// Find relations in the fields
+    $relations = [];
+    foreach ($fields as $field) {
+        if ($field['type_name'] === 'be_manager_relation') {
+            $options = json_decode($field['options'], true) ?: [];
+            $relations[] = [
+                'name' => $field['name'],
+                'label' => $field['label'],
+                'type' => $options['type'] ?? '1',
+                'table' => $options['table'] ?? '',
+                'relationTable' => $options['relation_table'] ?? ''
+            ];
+        }
+    }
+
+    // Generate Query Examples
+    $queryCode = [];
+    $queryCode[] = '<?php';
+    $queryCode[] = '// Basis-Queries';
+    $queryCode[] = '$items = ' . $className . '::query()';
+    $queryCode[] = '    ->where(\'status\', 1)                    // WHERE status = 1';
+    $queryCode[] = '    ->whereNot(\'status\', 0)                // WHERE status != 0';
+    $queryCode[] = '    ->whereNull(\'deleted_at\')              // WHERE deleted_at IS NULL';
+    $queryCode[] = '    ->whereNotNull(\'created_at\')           // WHERE created_at IS NOT NULL';
+    $queryCode[] = '    ->whereRaw(\'price > 100\')              // WHERE price > 100';
+    $queryCode[] = '    ->orderBy(\'name\')                      // ORDER BY name ASC';
+    $queryCode[] = '    ->orderBy(\'name\', \'desc\')            // ORDER BY name DESC';
+    $queryCode[] = '    ->limit(10)                              // LIMIT 10';
+    $queryCode[] = '    ->offset(20)                             // OFFSET 20';
+    $queryCode[] = '    ->find();';
+    $queryCode[] = '';
+
+    // Multiple conditions
+    $queryCode[] = '// Mehrere Bedingungen';
+    $queryCode[] = '$items = ' . $className . '::query()';
+    $queryCode[] = '    ->where(\'status\', 1)';
+    $queryCode[] = '    ->where(function (rex_yform_manager_query $query) {';
+    $queryCode[] = '        $query';
+    $queryCode[] = '            ->where(\'type\', \'news\')';
+    $queryCode[] = '            ->orWhere(\'type\', \'blog\');';
+    $queryCode[] = '    })';
+    $queryCode[] = '    ->find();';
+    $queryCode[] = '';
+
+    // Collection examples
+    $queryCode[] = '// Collection Handling';
+    $queryCode[] = '$items = ' . $className . '::query()->find();';
+    $queryCode[] = '';
+    $queryCode[] = '// Collection filtern';
+    $queryCode[] = '$filtered = $items->filter(function (' . $className . ' $item) {';
+    $queryCode[] = '    return $item->getStatus() == 1;';
+    $queryCode[] = '});';
+    $queryCode[] = '';
+    $queryCode[] = '// Collection transformieren';
+    $queryCode[] = '$transformed = $items->map(function (' . $className . ' $item) {';
+    $queryCode[] = '    return [';
+    $queryCode[] = '        \'id\' => $item->getId(),';
+    $queryCode[] = '        \'name\' => $item->getName()';
+    $queryCode[] = '    ];';
+    $queryCode[] = '});';
+    $queryCode[] = '';
+    $queryCode[] = '// Collection Methoden';
+    $queryCode[] = '$count = $items->count();          // Anzahl der Datensätze';
+    $queryCode[] = '$first = $items->first();          // Erster Datensatz';
+    $queryCode[] = '$last = $items->last();            // Letzter Datensatz';
+    $queryCode[] = '$exists = $items->exists();        // Prüfen ob Datensätze existieren';
+    $queryCode[] = '$isEmpty = $items->isEmpty();      // Prüfen ob keine Datensätze existieren';
+    $queryCode[] = '$array = $items->toArray();        // Als Array ausgeben';
+    $queryCode[] = '$ids = $items->getIds();           // Alle IDs als Array';
+    $queryCode[] = '';
+
+    if (!empty($relations)) {
+        $queryCode[] = '// Relations-Beispiele';
+        $queryCode[] = '';
+
+        foreach ($relations as $relation) {
+            $relatedClass = 'Rex' . str_replace(' ', '', ucwords(str_replace(['rex_', '_'], ['',' '], $relation['table'])));
+            
+            switch ($relation['type']) {
+                case '1': // 1:1
+                    $queryCode[] = '// 1:1 Relation für ' . $relation['label'];
+                    $queryCode[] = '$item = ' . $className . '::query()->findId(1);';
+                    $queryCode[] = '$related = $item->get' . ucfirst($relation['name']) . '(); // Einzelner ' . $relatedClass;
+                    $queryCode[] = '';
+                    break;
+
+                case '2': // 1:n
+                    $queryCode[] = '// 1:n Relation für ' . $relation['label'];
+                    $queryCode[] = '$item = ' . $className . '::query()->findId(1);';
+                    $queryCode[] = '$related = $item->get' . ucfirst($relation['name']) . '(); // Collection von ' . $relatedClass;
+                    $queryCode[] = '';
+                    $queryCode[] = '// Mit der Collection arbeiten';
+                    $queryCode[] = 'foreach ($related as $relatedItem) {';
+                    $queryCode[] = '    echo $relatedItem->getId();';
+                    $queryCode[] = '}';
+                    $queryCode[] = '';
+                    break;
+
+                case '4': // n:m
+                    $queryCode[] = '// n:m Relation für ' . $relation['label'];
+                    $queryCode[] = '$item = ' . $className . '::query()->findId(1);';
+                    $queryCode[] = '$related = $item->get' . ucfirst($relation['name']) . '(); // Collection von ' . $relatedClass;
+                    $queryCode[] = '';
+                    $queryCode[] = '// Mit der Collection arbeiten';
+                    $queryCode[] = 'foreach ($related as $relatedItem) {';
+                    $queryCode[] = '    echo $relatedItem->getId();';
+                    $queryCode[] = '}';
+                    $queryCode[] = '';
+                    $queryCode[] = '// Relation über Zwischentabelle ' . $relation['relationTable'];
+                    $queryCode[] = '$query = ' . $className . '::query()';
+                    $queryCode[] = '    ->alias(\'main\')';
+                    $queryCode[] = '    ->joinRelation(\'' . $relation['name'] . '\', \'rel\')';
+                    $queryCode[] = '    ->where(\'rel.status\', 1)';
+                    $queryCode[] = '    ->find();';
+                    $queryCode[] = '';
+                    break;
+            }
+        }
+
+        // Complex query example with relations
+        $queryCode[] = '// Komplexes Query-Beispiel mit Relations';
+        $queryCode[] = '$items = ' . $className . '::query()';
+        $queryCode[] = '    ->alias(\'main\')';
+        foreach ($relations as $i => $relation) {
+            $alias = 'rel' . ($i + 1);
+            $queryCode[] = '    ->joinRelation(\'' . $relation['name'] . '\', \'' . $alias . '\')';
+        }
+        $queryCode[] = '    ->selectRaw(\'main.*, COUNT(rel1.id) as count\')';
+        $queryCode[] = '    ->groupBy(\'main.id\')';
+        $queryCode[] = '    ->find();';
+        $queryCode[] = '';
+    }
+
+    // Show Query Examples
+    $fragment = new rex_fragment();
+    $fragment->setVar('title', 'Query Beispiele');
+    $fragment->setVar('body', '
+        <pre id="query-code" class="pre-scrollable"><code class="php">'.rex_escape(implode("\n", $queryCode)).'</code></pre>
+        <button class="btn btn-default" onclick="copyQueryCode()">
+            <i class="rex-icon fa-copy"></i> Query-Code kopieren
+        </button>
+        <script>
+        function copyQueryCode() {
+            const code = document.querySelector("#query-code code").textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert("Query-Code wurde in die Zwischenablage kopiert!");
+            });
+        }
+        </script>
+    ', false);
+    $content .= $fragment->parse('core/page/section.php');
