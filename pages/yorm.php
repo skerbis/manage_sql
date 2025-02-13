@@ -1,3 +1,140 @@
+<?php
+$content = '';
+
+// Get YForm tables
+$yformTables = [];
+if (rex_addon::get('yform')->isAvailable()) {
+    $tables = rex_sql::factory()->getArray('SELECT table_name FROM rex_yform_table');
+    $yformTables = array_column($tables, 'table_name');
+}
+
+// Get selected table structure if a table is selected
+$selectedTable = rex_request('table', 'string', '');
+$columns = [];
+if ($selectedTable && in_array($selectedTable, $yformTables)) {
+    $columns = rex_sql::showColumns($selectedTable);
+}
+
+// Build form
+$formContent = '
+<form id="yormbuilder" action="'.rex_url::currentBackendPage().'" method="get">
+    <input type="hidden" name="page" value="table_builder/yorm">
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="form-group">
+                <label for="table">YForm Tabelle</label>
+                <select name="table" id="table" class="form-control" onchange="this.form.submit()">
+                    <option value="">Bitte wählen...</option>';
+foreach ($yformTables as $table) {
+    $formContent .= '<option value="'.$table.'"'.($selectedTable === $table ? ' selected' : '').'>'.$table.'</option>';
+}
+$formContent .= '
+                </select>
+            </div>
+        </div>
+    </div>
+</form>';
+
+// Add selection form to content
+$fragment = new rex_fragment();
+$fragment->setVar('title', 'YORM Code Generator');
+$fragment->setVar('body', $formContent, false);
+$content .= $fragment->parse('core/page/section.php');
+
+if ($selectedTable && !empty($columns)) {
+    // Get YForm table definition
+    $yformTable = rex_sql::factory()->getArray('SELECT * FROM rex_yform_table WHERE table_name = :table', ['table' => $selectedTable])[0];
+    $fields = rex_sql::factory()->getArray('SELECT * FROM rex_yform_field WHERE table_name = :table ORDER BY prio', ['table' => $selectedTable]);
+    
+    // Debug output
+    echo '<div class="alert alert-info">';
+    echo '<h4>YForm Felder:</h4>';
+    echo '<pre>';
+    print_r($fields);
+    echo '</pre>';
+    echo '</div>';
+    
+    // Generate model code
+    $className = 'Rex' . str_replace(' ', '', ucwords(str_replace(['rex_', '_'], ['',' '], $selectedTable)));
+    
+    $modelCode = [];
+    $modelCode[] = '<?php';
+    $modelCode[] = '';
+    $modelCode[] = 'class ' . $className . ' extends rex_yform_manager_dataset';
+    $modelCode[] = '{';
+    $modelCode[] = '    protected static $table_name = \'' . $selectedTable . '\';';
+    $modelCode[] = '';
+    
+    // Generate getter methods for each field
+    foreach ($fields as $field) {
+        if ($field['type_id'] == 'value') {
+            $name = $field['name'];
+            $label = $field['label'] ?: $name;
+            
+            $methodName = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $name)));
+            
+            $typeMap = [
+                'text' => 'string',
+                'textarea' => 'string',
+                'select' => 'string',
+                'checkbox' => 'bool',
+                'radio' => 'bool',
+                'email' => 'string',
+                'integer' => 'int',
+                'float' => 'float',
+                'decimal' => 'float',
+                'date' => '?\\DateTime',
+                'datetime' => '?\\DateTime',
+                'time' => '?\\DateTime',
+                'be_link' => 'int',
+                'be_media' => 'string',
+                'be_medialist' => 'string',
+                'be_manager_relation' => 'rex_yform_manager_collection|null',
+                'choice' => 'string',
+            ];
+            
+            $type = $typeMap[$field['type_name']] ?? 'mixed';
+            
+            $modelCode[] = '    /**';
+            $modelCode[] = '     * ' . $label;
+            $modelCode[] = '     * @return ' . $type;
+            $modelCode[] = '     */';
+            
+            if ($field['type_name'] === 'be_manager_relation') {
+                $options = json_decode($field['options'], true) ?: [];
+                $relationType = $options['type'] ?? '1';
+                
+                if ($relationType == '4') { // n:m Relation
+                    $modelCode[] = '    public function ' . $methodName . '()';
+                    $modelCode[] = '    {';
+                    $modelCode[] = '        return $this->getRelatedCollection(\'' . $name . '\');';
+                    $modelCode[] = '    }';
+                } else if ($relationType == '2') { // 1:n Relation
+                    $modelCode[] = '    public function ' . $methodName . '()';
+                    $modelCode[] = '    {';
+                    $modelCode[] = '        return $this->getRelatedCollection(\'' . $name . '\');';
+                    $modelCode[] = '    }';
+                } else { // 1:1 Relation
+                    $modelCode[] = '    public function ' . $methodName . '()';
+                    $modelCode[] = '    {';
+                    $modelCode[] = '        return $this->getRelatedDataset(\'' . $name . '\');';
+                    $modelCode[] = '    }';
+                }
+            } elseif (in_array($field['type_name'], ['date', 'datetime', 'time'])) {
+                $modelCode[] = '    public function ' . $methodName . '()';
+                $modelCode[] = '    {';
+                $modelCode[] = '        $value = $this->getValue(\'' . $name . '\');';
+                $modelCode[] = '        return $value ? new \\DateTime($value) : null;';
+                $modelCode[] = '    }';
+            } else {
+                $modelCode[] = '    public function ' . $methodName . '()';
+                $modelCode[] = '    {';
+                $modelCode[] = '        return $this->getValue(\'' . $name . '\');';
+                $modelCode[] = '    }';
+            }
+            $modelCode[] = '';
+        }
+    }
 // Debug output
     echo '<div class="alert alert-info">';
     echo '<h4>Gefundene Felder:</h4>';
