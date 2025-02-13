@@ -1,8 +1,31 @@
-package: addon_key
-version: '0.0.0'
-author: 'Friends Of REDAXO'
-supportpage: https://github.com/FriendsOfREDAXO/addon_key
+package: table_builder
+version: '1.0.0'
+author: Your Name
+supportpage: https://github.com/your/repo
+
 requires:
-    redaxo: '^5.15.1'
     php:
-        version: '>=8.1, <9'
+        version: '>=8.1'
+    redaxo:
+        version: '>=5.18.1'
+
+page:
+    title: 'Table Builder'
+    perm: admin
+    subpages:
+        tables:
+            title: 'Tabellen'
+            icon: rex-icon fa-table
+        create:
+            title: 'Neue Tabelle'
+            icon: rex-icon fa-plus
+            itemclass: pull-right
+            perm: admin
+        sql:
+            title: 'SQL Export'
+            icon: rex-icon fa-code
+            itemclass: pull-right
+            perm: admin
+
+default_config:
+    table_prefix: 'rex_'
