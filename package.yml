@@ -19,6 +19,9 @@ page:
             title: 'Neue Tabelle'
             icon: rex-icon fa-plus
             itemclass: pull-right
+        query:
+            title: 'Query Builder'
+            icon: rex-icon fa-database
         sql:
             title: 'SQL Export'
             icon: rex-icon fa-code
