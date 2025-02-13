@@ -35,3 +35,7 @@ page:
             title: 'Tabelle bearbeiten'
             icon: rex-icon fa-edit
             hidden: true
+        beholder:
+            title: Hausmeister'
+            icon: rex-icon fa-edit
+            hidden: true
