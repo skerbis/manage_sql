@@ -241,28 +241,55 @@ $content .= $fragment->parse('core/page/section.php');
 
 echo $content;?>
 <style>
-
-    /* Stelle sicher, dass die Datalist angezeigt wird */
+/* Grundeinstellungen für datalist */
 datalist {
-  display: block; /* Oder grid, flex, je nach Layout */
-  position: absolute; /*  Wichtig, um Probleme mit dem Layout zu vermeiden */
-  background-color: #fff; /* Hintergrundfarbe */
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Optional: Schatten */
+  display: block; /* Stelle sicher, dass sie ein Blockelement ist */
+  position: absolute;  /*  Wichtig für die Positionierung */
   z-index: 10; /* Stell sicher, dass sie über anderen Elementen liegt */
-  width: 100%; /* Passe die Breite an */
+  background-color: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  width: calc(100% - 2px); /* Breite anpassen, abzüglich der Border */
   max-height: 200px;
   overflow-y: auto;
-
+  padding: 0; /* Wichtig: Entferne Standard-Padding */
+  margin: 0; /* Wichtig: Entferne Standard-Margin */
+  list-style: none; /* Entferne Aufzählungszeichen */
+  box-sizing: border-box; /* Stell sicher, dass padding/border in width einbezogen werden */
 }
 
 /* Style die Options (optional) */
 datalist option {
   padding: 5px 10px;
   cursor: pointer;
+  white-space: nowrap; /* Verhindere Zeilenumbrüche */
 }
 
 datalist option:hover {
   background-color: #f0f0f0;
+}
+
+/* WICHTIG: Spezifisches Styling für das Input-Feld, um die Datalist auszulösen */
+input[list] {
+  -webkit-appearance: none; /* Deaktiviere Standard-Safari-Styling */
+  /* Zusätzliche Styles für das Input-Feld nach Bedarf */
+}
+
+input[list]::-webkit-calendar-picker-indicator {
+  display: none; /* Optional: Entferne den Kalender-Indikator, falls vorhanden */
+}
+
+/* Optional:  Ein Pfeil-Symbol im Input-Feld */
+input[list] {
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 11L3 6H13L8 11Z' fill='%23444444'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px;
+  padding-right: 25px; /* Platz für den Pfeil schaffen */
+}
+
+/* Wichtig: Korrekte Positionierung der Datalist relativ zum Input */
+.form-group {
+  position: relative; /* Stelle sicher, dass das umgebende Element positioniert ist */
 }
 </style>
