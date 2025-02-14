@@ -191,20 +191,81 @@ if ($selectedTable) {
         </div>';
     });
 
-    // Add table responsive class
-    $list->addTableAttribute('class', 'table-responsive');
+    // Wrap table in custom wrapper div
+    $list->addTableAttribute('class', 'table-striped');
+    $tableContent = '<div class="table-wrapper">' . $list->get() . '</div>';
     
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Datensätze');
     $fragment->setVar('content', $list->get(), false);
     $content .= $fragment->parse('core/page/section.php');
 
-    // Add custom CSS for mobile optimization
+    // Show edit form if requested
+    if ($editId = rex_request('edit_id', 'int')) {
+        $sql = rex_sql::factory();
+        $sql->setTable($selectedTable);
+        $sql->setWhere(['id' => $editId]);
+        $sql->select();
+        
+        if ($sql->getRows()) {
+            $editForm = '
+            <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                <input type="hidden" name="record_action" value="save">
+                <input type="hidden" name="record_id" value="' . $editId . '">
+                ' . rex_csrf_token::factory('table_records')->getHiddenField();
+            
+            foreach ($columns as $column) {
+                if ($column['name'] === 'id') continue;
+                
+                $label = ucfirst(str_replace('_', ' ', $column['name']));
+                $value = $sql->getValue($column['name']);
+                
+                if (str_contains($column['type'], 'text')) {
+                    $editForm .= '
+                    <div class="form-group">
+                        <label>' . $label . '</label>
+                        <textarea name="data[' . $column['name'] . ']" class="form-control" rows="3">' . rex_escape($value) . '</textarea>
+                    </div>';
+                } else {
+                    $editForm .= '
+                    <div class="form-group">
+                        <label>' . $label . '</label>
+                        <input type="text" name="data[' . $column['name'] . ']" value="' . rex_escape($value) . '" class="form-control">
+                    </div>';
+                }
+            }
+            
+            $editForm .= '
+                <button type="submit" class="btn btn-save">Speichern</button>
+                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
+            </form>';
+            
+            $fragment = new rex_fragment();
+            $fragment->setVar('title', 'Datensatz bearbeiten');
+            $fragment->setVar('body', $editForm, false);
+            $content .= $fragment->parse('core/page/section.php');
+        }
+    }
+
+    // Add custom CSS for mobile optimization and fixed action column
     $content .= '
     <style>
-        .table-responsive {
-            border: 0;
+        .table-wrapper {
+            position: relative;
+            overflow-x: auto;
             margin-bottom: 0;
+            border: 0;
+        }
+        .table-wrapper table {
+            margin-bottom: 0;
+        }
+        .table-wrapper th:first-child,
+        .table-wrapper td:first-child {
+            position: sticky;
+            left: 0;
+            background: #fff;
+            z-index: 1;
+            border-right: 2px solid #eee;
         }
         @media screen and (max-width: 768px) {
             .table-responsive > .table > tbody > tr > td {
