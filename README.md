@@ -100,9 +100,7 @@ https://github.com/alexplusde/table_builder
 MIT Lizenz, siehe [LICENSE.md](LICENSE.md)
 
 ## Autor
-
-**Alexander Walther**  
-https://github.com/alexplusde
+Thomas Skerbis
 
 ## Credits
 
