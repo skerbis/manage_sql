@@ -7,12 +7,163 @@ $error = '';
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
 
+// CSRF protection
+$csrfToken = rex_csrf_token::factory('table_records');
+
+// Handle actions when form is submitted
+if ($action && !$csrfToken->isValid()) {
+    $error = rex_i18n::msg('csrf_token_invalid');
+} elseif ($action) {
+    $sql = rex_sql::factory();
+    $sql->setDebug(false);
+    
+    try {
+        switch ($action) {
+            case 'search':
+                $searchColumn = rex_post('search_column', 'string');
+                $searchTerm = rex_post('search_term', 'string');
+                $searchType = rex_post('search_type', 'string');
+                
+                // Build WHERE clause based on search type
+                $where = '';
+                $params = [];
+                if ($searchColumn && $searchTerm) {
+                    switch ($searchType) {
+                        case 'exact':
+                            $where = $searchColumn . ' = :term';
+                            $params['term'] = $searchTerm;
+                            break;
+                        case 'starts':
+                            $where = $searchColumn . ' LIKE :term';
+                            $params['term'] = $searchTerm . '%';
+                            break;
+                        case 'ends':
+                            $where = $searchColumn . ' LIKE :term';
+                            $params['term'] = '%' . $searchTerm;
+                            break;
+                        default: // contains
+                            $where = $searchColumn . ' LIKE :term';
+                            $params['term'] = '%' . $searchTerm . '%';
+                    }
+                    
+                    $sql->setQuery('SELECT * FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+                    $message = count($sql->getArray()) . ' Datensätze gefunden.';
+                }
+                break;
+
+            case 'replace':
+                $replaceColumn = rex_post('replace_column', 'string');
+                $searchTerm = rex_post('search_term', 'string');
+                $replaceTerm = rex_post('replace_term', 'string');
+                
+                if ($replaceColumn && $searchTerm) {
+                    $sql->setQuery(
+                        'UPDATE ' . $selectedTable . ' 
+                         SET ' . $replaceColumn . ' = REPLACE(' . $replaceColumn . ', :search, :replace)',
+                        ['search' => $searchTerm, 'replace' => $replaceTerm]
+                    );
+                    $message = $sql->getRows() . ' Datensätze aktualisiert.';
+                }
+                break;
+
+            case 'delete_results':
+                $searchColumn = rex_post('search_column', 'string');
+                $searchTerm = rex_post('search_term', 'string');
+                $searchType = rex_post('search_type', 'string');
+                
+                if ($searchColumn && $searchTerm) {
+                    $where = '';
+                    $params = [];
+                    switch ($searchType) {
+                        case 'exact':
+                            $where = $searchColumn . ' = :term';
+                            break;
+                        case 'starts':
+                            $where = $searchColumn . ' LIKE :term';
+                            $searchTerm .= '%';
+                            break;
+                        case 'ends':
+                            $where = $searchColumn . ' LIKE :term';
+                            $searchTerm = '%' . $searchTerm;
+                            break;
+                        default: // contains
+                            $where = $searchColumn . ' LIKE :term';
+                            $searchTerm = '%' . $searchTerm . '%';
+                    }
+                    $params['term'] = $searchTerm;
+                    
+                    $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+                    $message = $sql->getRows() . ' Datensätze gelöscht.';
+                }
+                break;
+
+            case 'truncate':
+                $sql->setQuery('TRUNCATE TABLE ' . $selectedTable);
+                $message = 'Tabelle wurde geleert.';
+                break;
+                
+            case 'save':
+                $data = rex_post('data', 'array', []);
+                $recordId = rex_post('record_id', 'int');
+                
+                if ($data && $recordId) {
+                    $sql->setTable($selectedTable);
+                    $sql->setWhere(['id' => $recordId]);
+                    $sql->setValues($data);
+                    $sql->update();
+                    $message = 'Datensatz gespeichert.';
+                }
+                break;
+                
+            case 'create':
+                $data = rex_post('data', 'array', []);
+                
+                if ($data) {
+                    $sql->setTable($selectedTable);
+                    $sql->setValues($data);
+                    $sql->insert();
+                    $message = 'Datensatz erstellt.';
+                }
+                break;
+        }
+    } catch (rex_sql_exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
+// Handle single record actions 
+$recordAction = rex_get('record_action', 'string');
+$recordId = rex_get('record_id', 'int');
+
+if ($recordAction && $recordId && $csrfToken->isValid()) {
+    $sql = rex_sql::factory();
+    
+    try {
+        switch ($recordAction) {
+            case 'delete':
+                $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
+                $message = 'Datensatz gelöscht.';
+                break;
+        }
+    } catch (rex_sql_exception $e) {
+        $error = $e->getMessage();
+    }
+}
+
 // Get all tables
 $sql = rex_sql::factory();
 $tables = $sql->getTablesAndViews();
 $tables = array_filter($tables, function($table) {
     return str_starts_with($table, 'rex_');
 });
+
+// Show messages
+if ($error) {
+    $content .= rex_view::error($error);
+}
+if ($message) {
+    $content .= rex_view::success($message);
+}
 
 // Table selection form
 $formContent = '
@@ -85,7 +236,7 @@ if ($selectedTable) {
                                 </div>
                             </div>
                         </div>
-                        ' . rex_csrf_token::factory('table_records')->getHiddenField() . '
+                        ' . $csrfToken->getHiddenField() . '
                     </form>
                 </div>
             </div>
@@ -127,7 +278,7 @@ if ($selectedTable) {
                                 </div>
                             </div>
                         </div>
-                        ' . rex_csrf_token::factory('table_records')->getHiddenField() . '
+                        ' . $csrfToken->getHiddenField() . '
                     </form>
                 </div>
             </div>
@@ -151,7 +302,7 @@ if ($selectedTable) {
                         <button type="submit" class="btn btn-danger" onclick="return confirm(\'Tabelle wirklich leeren?\')">
                             <i class="rex-icon fa-trash"></i> Tabelle leeren (TRUNCATE)
                         </button>
-                        ' . rex_csrf_token::factory('table_records')->getHiddenField() . '
+                        ' . $csrfToken->getHiddenField() . '
                     </form>
                 </div>
             </div>
@@ -163,34 +314,78 @@ if ($selectedTable) {
     $fragment->setVar('body', $actionContent, false);
     $content .= $fragment->parse('core/page/section.php');
 
-    // Add responsive table wrapper and classes
+   // Records list 
     $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
     
-    // Add actions column first
+    // Add actions column
     $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
     $list->setColumnPosition('_actions', 0);
-    $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
-        $token = rex_csrf_token::factory('table_records');
-        $editUrl = rex_url::backendPage('table_builder/records', [
+    $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
+        $editUrl = rex_url::currentBackendPage([
             'table' => $selectedTable,
             'edit_id' => $params['list']->getValue('id')
         ]);
-        $deleteUrl = rex_url::backendPage('table_builder/records', [
+
+        $copyUrl = rex_url::currentBackendPage([
+            'table' => $selectedTable,
+            'func' => 'add',
+            'id' => $params['list']->getValue('id')
+        ]);
+        
+        $deleteUrl = rex_url::currentBackendPage([
             'table' => $selectedTable,
             'record_action' => 'delete',
             'record_id' => $params['list']->getValue('id')
-        ]) . '&' . $token->getUrlParams();
+        ]) . '&' . $csrfToken->getUrlParams();
         
         return '
         <div class="btn-group">
             <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
                 <i class="rex-icon fa-edit"></i>
             </a>
+            <a href="' . $copyUrl . '" class="btn btn-default btn-xs" title="Kopieren">
+                <i class="rex-icon fa-copy"></i>
+            </a>
             <a href="' . $deleteUrl . '" class="btn btn-delete btn-xs" onclick="return confirm(\'Wirklich löschen?\')" title="Löschen">
                 <i class="rex-icon fa-trash"></i>
             </a>
         </div>';
     });
+
+    // Format columns based on data type
+    foreach ($columns as $column) {
+        $name = $column['name'];
+        if ($name === 'id') continue;
+
+        // Truncate text fields if too long
+        if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
+            $list->setColumnFormat($name, 'custom', function ($params) {
+                $value = $params['value'];
+                if (strlen($value) > 100) {
+                    $value = substr($value, 0, 100) . '...';
+                }
+                return rex_escape($value);
+            });
+        }
+        
+        // Format dates
+        if (strpos($column['type'], 'datetime') !== false) {
+            $list->setColumnFormat($name, 'custom', function ($params) {
+                $value = $params['value'];
+                if ($value) {
+                    return rex_formatter::strftime(strtotime($value), 'datetime');
+                }
+                return '';
+            });
+        }
+
+        // Format boolean values
+        if (strpos($column['type'], 'tinyint(1)') !== false) {
+            $list->setColumnFormat($name, 'custom', function ($params) {
+                return $params['value'] ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
+            });
+        }
+    }
 
     // Wrap table in custom wrapper div
     $list->addTableAttribute('class', 'table-striped');
@@ -201,20 +396,17 @@ if ($selectedTable) {
     $fragment->setVar('content', $tableContent, false);
     $content .= $fragment->parse('core/page/section.php');
 
-    // Add "New Record" button if not editing
-    if (!$editId) {
-        $content .= '
-        <div class="panel panel-default">
-            <div class="panel-body">
-                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']) . '" class="btn btn-save">
-                    <i class="rex-icon fa-plus"></i> Neuer Datensatz
-                </a>
-            </div>
-        </div>';
+    // Check if we're in edit mode
+    $editId = rex_request('edit_id', 'int', 0);
+    $addMode = rex_get('func') === 'add';
+
+    // If we're adding a new record based on an existing one, load that data
+    if ($addMode && ($copyId = rex_get('id', 'int'))) {
+        $editId = $copyId;
     }
 
     // Show edit/add form if requested
-    if ($editId || rex_get('func') === 'add') {
+    if ($editId || $addMode) {
         $sql = rex_sql::factory();
         
         if ($editId) {
@@ -226,9 +418,9 @@ if ($selectedTable) {
         if (!$editId || $sql->getRows()) {
             $editForm = '
             <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
-                <input type="hidden" name="record_action" value="' . ($editId ? 'save' : 'create') . '">
-                ' . ($editId ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
-                ' . rex_csrf_token::factory('table_records')->getHiddenField();
+                <input type="hidden" name="action" value="' . ($addMode ? 'create' : 'save') . '">
+                ' . ($editId && !$addMode ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
+                ' . $csrfToken->getHiddenField();
             
             foreach ($columns as $column) {
                 if ($column['name'] === 'id') continue;
@@ -236,11 +428,32 @@ if ($selectedTable) {
                 $label = ucfirst(str_replace('_', ' ', $column['name']));
                 $value = $editId ? $sql->getValue($column['name']) : '';
                 
-                if (str_contains($column['type'], 'text')) {
+                // Different input types based on column type
+                if (strpos($column['type'], 'text') !== false) {
                     $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
                         <textarea name="data[' . $column['name'] . ']" class="form-control" rows="3">' . rex_escape($value) . '</textarea>
+                    </div>';
+                } elseif (strpos($column['type'], 'datetime') !== false) {
+                    $editForm .= '
+                    <div class="form-group">
+                        <label>' . $label . '</label>
+                        <input type="datetime-local" name="data[' . $column['name'] . ']" value="' . ($value ? date('Y-m-d\TH:i', strtotime($value)) : '') . '" class="form-control">
+                    </div>';
+                } elseif (strpos($column['type'], 'date') !== false) {
+                    $editForm .= '
+                    <div class="form-group">
+                        <label>' . $label . '</label>
+                        <input type="date" name="data[' . $column['name'] . ']" value="' . ($value ? date('Y-m-d', strtotime($value)) : '') . '" class="form-control">
+                    </div>';
+                } elseif (strpos($column['type'], 'tinyint(1)') !== false) {
+                    $editForm .= '
+                    <div class="form-group">
+                        <label class="checkbox">
+                            <input type="checkbox" name="data[' . $column['name'] . ']" value="1"' . ($value ? ' checked' : '') . '>
+                            ' . $label . '
+                        </label>
                     </div>';
                 } else {
                     $editForm .= '
@@ -252,16 +465,27 @@ if ($selectedTable) {
             }
             
             $editForm .= '
-                <button type="submit" class="btn btn-save">' . ($editId ? 'Speichern' : 'Erstellen') . '</button>
-                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
+                <div class="btn-toolbar">
+                    <button type="submit" class="btn btn-save">' . ($addMode ? 'Erstellen' : 'Speichern') . '</button>
+                    <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
+                </div>
             </form>';
             
             $fragment = new rex_fragment();
-            $fragment->setVar('title', $editId ? 'Datensatz bearbeiten' : 'Neuer Datensatz');
+            $fragment->setVar('title', $addMode ? 'Neuer Datensatz' : 'Datensatz bearbeiten');
             $fragment->setVar('body', $editForm, false);
             $content .= $fragment->parse('core/page/section.php');
         }
     } else {
+        // Add "New Record" button if not editing
+        $content .= '
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']) . '" class="btn btn-save">
+                    <i class="rex-icon fa-plus"></i> Neuer Datensatz
+                </a>
+            </div>
+        </div>';
     }
 
     // Add custom CSS for mobile optimization and fixed action column
@@ -283,6 +507,9 @@ if ($selectedTable) {
             background: #fff;
             z-index: 1;
             border-right: 2px solid #eee;
+        }
+        .checkbox {
+            margin-top: 7px;
         }
         @media screen and (max-width: 768px) {
             .table-responsive > .table > tbody > tr > td {
@@ -306,6 +533,3 @@ if ($selectedTable) {
             }
         }
     </style>';
-}
-
-echo $content;
