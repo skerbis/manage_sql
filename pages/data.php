@@ -32,8 +32,8 @@ if ($selectedTable && $action && rex_csrf_token::factory('table_action')->isVali
             case 'replace':
                 if ($searchValue && $searchField && $replaceValue) {
                     $sql->setQuery(
-                        'UPDATE ' . $sql->escapeIdentifier($selectedTable) . 
-                        ' SET ' . $sql->escapeIdentifier($searchField) . ' = REPLACE(' . 
+                        'UPDATE ' . $sql->escapeIdentifier($selectedTable) .
+                        ' SET ' . $sql->escapeIdentifier($searchField) . ' = REPLACE(' .
                         $sql->escapeIdentifier($searchField) . ', :search, :replace)',
                         ['search' => $searchValue, 'replace' => $replaceValue]
                     );
@@ -43,7 +43,7 @@ if ($selectedTable && $action && rex_csrf_token::factory('table_action')->isVali
             case 'delete_found':
                 if ($searchValue && $searchField) {
                     $sql->setQuery(
-                        'DELETE FROM ' . $sql->escapeIdentifier($selectedTable) . 
+                        'DELETE FROM ' . $sql->escapeIdentifier($selectedTable) .
                         ' WHERE ' . $sql->escapeIdentifier($searchField) . ' LIKE :search',
                         ['search' => '%' . $searchValue . '%']
                     );
@@ -128,7 +128,7 @@ if ($selectedTable) {
             </div>
             <div class="col-sm-3">
                 <div class="form-group">
-                    <label>&nbsp;</label>
+                    <label> </label>
                     <div class="btn-group btn-group-justified">
                         <a class="btn btn-primary" onclick="this.closest(\'form\').submit()">
                             <i class="rex-icon fa-search"></i> Suchen
@@ -178,26 +178,35 @@ if ($selectedTable) {
     try {
         $sql = rex_sql::factory();
         $query = 'SELECT * FROM ' . $sql->escapeIdentifier($selectedTable);
+        $countQuery = 'SELECT COUNT(*) FROM ' . $sql->escapeIdentifier($selectedTable); // Separate count query
+
+        $whereClause = '';
+        $params = [];
 
         if ($searchValue && $searchField) {
-            $query .= ' WHERE ' . $sql->escapeIdentifier($searchField) . ' LIKE :search';
+            $whereClause = ' WHERE ' . $sql->escapeIdentifier($searchField) . ' LIKE :search';
             $params = ['search' => '%' . $searchValue . '%'];
-        } else {
-            $params = [];
+            $query .= $whereClause;
+            $countQuery .= $whereClause;
         }
 
         $query .= ' ORDER BY id DESC';
-        
-        $list = rex_list::factory($query, 50, 'table-'.$selectedTable, false);
-        
+
+        // Manually fetch the total count before creating rex_list
+        $countSql = rex_sql::factory();
+        $countSql->setQuery($countQuery, $params);
+        $totalRows = (int) $countSql->getValue('COUNT(*)'); // Cast to integer
+
+        $list = rex_list::factory($query, 50, 'table-'.$selectedTable, false, $totalRows); // Pass total rows
+
         if ($searchValue && $searchField) {
             $list->addParam('search', $searchValue);
             $list->addParam('field', $searchField);
             $list->addParam('table', $selectedTable);
         }
-        
+
         $list->addTableAttribute('class', 'table-striped table-hover');
-        
+
         $columns = rex_sql::showColumns($selectedTable);
         foreach ($columns as $column) {
             $columnName = $column['name'];
@@ -209,7 +218,7 @@ if ($selectedTable) {
                 return rex_escape($value);
             });
         }
-        
+
         $content .= '<div class="table-responsive">';
         $content .= $list->get();
         $content .= '</div>';
