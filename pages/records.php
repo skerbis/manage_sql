@@ -6,9 +6,6 @@ $error = '';
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
-$recordAction = rex_post('record_action', 'string');
-$recordId = rex_get('record_id', 'int');
-$editId = rex_get('edit_id', 'int', 0); // Initialize $editId
 
 // Get all tables
 $sql = rex_sql::factory();
@@ -41,7 +38,7 @@ $content .= $fragment->parse('core/page/section.php');
 if ($selectedTable) {
     $columns = rex_sql::showColumns($selectedTable);
     $columnNames = array_column($columns, 'name');
-
+    
     // Accordion for actions
     $actionContent = '
     <div class="panel-group" id="accordion" role="tablist">
@@ -80,7 +77,7 @@ if ($selectedTable) {
                                     <input type="text" name="search_term" class="form-control" required>
                                     <span class="input-group-btn">
                                         <button type="submit" class="btn btn-primary"><i class="rex-icon fa-search"></i></button>
-                                        <button type="submit" name="action" value="delete_results" class="btn btn-danger"
+                                        <button type="submit" name="action" value="delete_results" class="btn btn-danger" 
                                             onclick="return confirm(\'Gefundene Datensätze wirklich löschen?\')">
                                             <i class="rex-icon fa-trash"></i>
                                         </button>
@@ -168,32 +165,22 @@ if ($selectedTable) {
 
     // Add responsive table wrapper and classes
     $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
-
+    
     // Add actions column first
     $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
     $list->setColumnPosition('_actions', 0);
     $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
-        $id = $params['list']->getValue('id'); // Get the ID of the current record
         $token = rex_csrf_token::factory('table_records');
-
         $editUrl = rex_url::backendPage('table_builder/records', [
             'table' => $selectedTable,
-            'edit_id' => $id
+            'edit_id' => $params['list']->getValue('id')
         ]);
-
-        // Generate the delete URL correctly, including the CSRF token.
-        $deleteUrl = rex_url::currentBackendPage([ // Use currentBackendPage to preserve other GET params
+        $deleteUrl = rex_url::backendPage('table_builder/records', [
             'table' => $selectedTable,
             'record_action' => 'delete',
-            'record_id' => $id,
-            ...$token->getUrlParamsAsArray(), // Use getUrlParamsAsArray to merge token params
-        ]);
-
-        // Debugging: Output the generated URLs and token validity
-        dump('Edit URL: ' . $editUrl);
-        dump('Delete URL: ' . $deleteUrl);
-        dump('Is CSRF Token Valid (in URL Generation): ' . $token->isValid()); //Check during generation
-
+            'record_id' => $params['list']->getValue('id')
+        ]) . '&' . $token->getUrlParams();
+        
         return '
         <div class="btn-group">
             <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
@@ -208,7 +195,7 @@ if ($selectedTable) {
     // Wrap table in custom wrapper div
     $list->addTableAttribute('class', 'table-striped');
     $tableContent = '<div class="table-wrapper">' . $list->get() . '</div>';
-
+    
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Datensätze');
     $fragment->setVar('content', $tableContent, false);
@@ -229,26 +216,26 @@ if ($selectedTable) {
     // Show edit/add form if requested
     if ($editId || rex_get('func') === 'add') {
         $sql = rex_sql::factory();
-
+        
         if ($editId) {
             $sql->setTable($selectedTable);
             $sql->setWhere(['id' => $editId]);
             $sql->select();
         }
-
+        
         if (!$editId || $sql->getRows()) {
             $editForm = '
             <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
                 <input type="hidden" name="record_action" value="' . ($editId ? 'save' : 'create') . '">
                 ' . ($editId ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
                 ' . rex_csrf_token::factory('table_records')->getHiddenField();
-
+            
             foreach ($columns as $column) {
                 if ($column['name'] === 'id') continue;
-
+                
                 $label = ucfirst(str_replace('_', ' ', $column['name']));
                 $value = $editId ? $sql->getValue($column['name']) : '';
-
+                
                 if (str_contains($column['type'], 'text')) {
                     $editForm .= '
                     <div class="form-group">
@@ -263,12 +250,12 @@ if ($selectedTable) {
                     </div>';
                 }
             }
-
+            
             $editForm .= '
                 <button type="submit" class="btn btn-save">' . ($editId ? 'Speichern' : 'Erstellen') . '</button>
                 <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
             </form>';
-
+            
             $fragment = new rex_fragment();
             $fragment->setVar('title', $editId ? 'Datensatz bearbeiten' : 'Neuer Datensatz');
             $fragment->setVar('body', $editForm, false);
@@ -319,240 +306,6 @@ if ($selectedTable) {
             }
         }
     </style>';
-
-    // ----- ACTIONS (Save/Create/Delete/Search/Replace/Truncate) -----
-
-    $token = rex_csrf_token::factory('table_records');
-
-    // ** 1. SAVE/CREATE **
-    if (in_array($recordAction, ['save', 'create']) && $token->isValid()) {
-        $data = rex_post('data', 'array');
-
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-
-        foreach ($columns as $column) {
-            if ($column['name'] === 'id') continue; // ID wird nicht gesetzt/verändert
-            $sql->setValue($column['name'], $data[$column['name']] ?? null);  //Null-Coalescing Operator, falls Wert fehlt
-        }
-
-        if ($recordAction === 'save') {
-            $sql->setWhere(['id' => $recordId]);
-            try {
-                $sql->update();
-                $message = 'Datensatz erfolgreich gespeichert.';
-            } catch (Exception $e) {
-                $error = 'Fehler beim Speichern des Datensatzes: ' . $e->getMessage();
-            }
-
-        } elseif ($recordAction === 'create') {
-            try {
-                $sql->insert();
-                $message = 'Datensatz erfolgreich erstellt.';
-            } catch (Exception $e) {
-                $error = 'Fehler beim Erstellen des Datensatzes: ' . $e->getMessage();
-            }
-        }
-        // Redirect, um das Formular zu leeren und die Änderungen anzuzeigen
-        echo rex_view::success($message);
-        echo rex_view::error($error);
-
-        echo '<script>
-                 window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
-              </script>';
-        exit(); //Wichtig, um weiteren Output zu verhindern
-    }
-
-    // ** 2. DELETE **
-    if ($recordAction === 'delete' && rex_csrf_token::factory('table_records')->isValid()) {  //Revalidate!
-        $recordId = rex_get('record_id', 'int'); // Get record_id safely
-
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        $sql->setWhere(['id' => $recordId]);
-
-        try {
-            $sql->delete();
-            $message = 'Datensatz erfolgreich gelöscht.';
-        } catch (Exception $e) {
-            $error = 'Fehler beim Löschen des Datensatzes: ' . $e->getMessage();
-        }
-
-        echo rex_view::success($message);
-        echo rex_view::error($error);
-
-        echo '<script>
-                 window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
-              </script>';
-        exit(); //Wichtig, um weiteren Output zu verhindern
-    }  else {
-            dump("CSRF Token invalid or recordAction is not delete!");
-    }
-
-    // ** 3. SEARCH **
-    if ($action === 'search' && $token->isValid()) {
-        $searchColumn = rex_post('search_column', 'string');
-        $searchTerm = rex_post('search_term', 'string');
-        $searchType = rex_post('search_type', 'string');
-
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        $searchTerm = $sql->escape($searchTerm);
-
-        switch ($searchType) {
-            case 'contains':
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm%'";
-                break;
-            case 'exact':
-                $whereClause = "`$searchColumn` = '$searchTerm'";
-                break;
-            case 'starts':
-                $whereClause = "`$searchColumn` LIKE '$searchTerm%'";
-                break;
-            case 'ends':
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm'";
-                break;
-            default:
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm%'"; // Default: Contains
-        }
-
-        $sql->setWhere($whereClause);
-
-        //Anzeige der Suchergebnisse
-        $list = rex_list::factory($sql->getQuery(), 30);  //Query wird direkt übergeben
-
-        // Add actions column first
-        $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
-        $list->setColumnPosition('_actions', 0);
-        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
-            $id = $params['list']->getValue('id'); // Get the ID of the current record
-            $token = rex_csrf_token::factory('table_records');
-
-            $editUrl = rex_url::backendPage('table_builder/records', [
-                'table' => $selectedTable,
-                'edit_id' => $id
-            ]);
-
-            // Generate the delete URL correctly, including the CSRF token.
-            $deleteUrl = rex_url::currentBackendPage([ // Use currentBackendPage to preserve other GET params
-                'table' => $selectedTable,
-                'record_action' => 'delete',
-                'record_id' => $id,
-                ...$token->getUrlParamsAsArray(), // Use getUrlParamsAsArray to merge token params
-            ]);
-
-            return '
-            <div class="btn-group">
-                <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
-                    <i class="rex-icon fa-edit"></i>
-                </a>
-                <a href="' . $deleteUrl . '" class="btn btn-delete btn-xs" onclick="return confirm(\'Wirklich löschen?\')" title="Löschen">
-                    <i class="rex-icon fa-trash"></i>
-                </a>
-            </div>';
-        });
-
-        // Wrap table in custom wrapper div
-        $list->addTableAttribute('class', 'table-striped');
-        $tableContent = '<div class="table-wrapper">' . $list->get() . '</div>';
-
-        $fragment = new rex_fragment();
-        $fragment->setVar('title', 'Suchergebnisse');
-        $fragment->setVar('content', $tableContent, false);
-        $content = $fragment->parse('core/page/section.php');
-
-        echo $content;
-    }
-
-    // ** 4. DELETE RESULTS **
-    if ($action === 'delete_results' && $token->isValid()) {
-        $searchColumn = rex_post('search_column', 'string');
-        $searchTerm = rex_post('search_term', 'string');
-        $searchType = rex_post('search_type', 'string');
-
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        $searchTerm = $sql->escape($searchTerm);
-
-        switch ($searchType) {
-            case 'contains':
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm%'";
-                break;
-            case 'exact':
-                $whereClause = "`$searchColumn` = '$searchTerm'";
-                break;
-            case 'starts':
-                $whereClause = "`$searchColumn` LIKE '$searchTerm%'";
-                break;
-            case 'ends':
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm'";
-                break;
-            default:
-                $whereClause = "`$searchColumn` LIKE '%$searchTerm%'"; // Default: Contains
-        }
-
-        try {
-            // Delete all records that match the search criteria
-            $sql->setQuery("DELETE FROM `$selectedTable` WHERE " . $whereClause);
-            $message = 'Gefundene Datensätze erfolgreich gelöscht.';
-        } catch (Exception $e) {
-            $error = 'Fehler beim Löschen der Datensätze: ' . $e->getMessage();
-        }
-        echo rex_view::success($message);
-        echo rex_view::error($error);
-
-        echo '<script>
-                 window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
-              </script>';
-        exit(); //Wichtig, um weiteren Output zu verhindern
-    }
-
-    // ** 5. REPLACE **
-    if ($action === 'replace' && $token->isValid()) {
-        $replaceColumn = rex_post('replace_column', 'string');
-        $searchTerm = rex_post('search_term', 'string');
-        $replaceTerm = rex_post('replace_term', 'string');
-
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        $searchTerm = $sql->escape($searchTerm);
-        $replaceTerm = $sql->escape($replaceTerm);
-
-        $sql->setQuery("UPDATE `$selectedTable` SET `$replaceColumn` = REPLACE(`$replaceColumn`, '$searchTerm', '$replaceTerm')");
-
-        $message = 'Ersetzen erfolgreich durchgeführt.';
-        echo rex_view::success($message);
-
-        echo '<script>
-                 window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
-              </script>';
-        exit();
-    }
-
-    // ** 6. TRUNCATE **
-    if ($action === 'truncate' && $token->isValid()) {
-        $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        try {
-            $sql->setQuery('TRUNCATE TABLE `' . $selectedTable . '`');
-            $message = 'Tabelle erfolgreich geleert.';
-        } catch (Exception $e) {
-            $error = 'Fehler beim Leeren der Tabelle: ' . $e->getMessage();
-        }
-        echo rex_view::success($message);
-        echo rex_view::error($error);
-
-        echo '<script>
-                 window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
-              </script>';
-        exit();
-    }
-
-    if ($message) {
-        echo rex_view::success($message);
-    }
-    if ($error) {
-        echo rex_view::error($error);
-    }
 }
+
 echo $content;
