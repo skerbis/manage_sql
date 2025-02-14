@@ -201,25 +201,40 @@ if ($selectedTable) {
     $fragment->setVar('content', $tableContent, false);
     $content .= $fragment->parse('core/page/section.php');
 
-    // Show edit form if requested
-    if ($editId = rex_request('edit_id', 'int')) {
+    // Add "New Record" button if not editing
+    if (!$editId) {
+        $content .= '
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']) . '" class="btn btn-save">
+                    <i class="rex-icon fa-plus"></i> Neuer Datensatz
+                </a>
+            </div>
+        </div>';
+    }
+
+    // Show edit/add form if requested
+    if ($editId || rex_get('func') === 'add') {
         $sql = rex_sql::factory();
-        $sql->setTable($selectedTable);
-        $sql->setWhere(['id' => $editId]);
-        $sql->select();
         
-        if ($sql->getRows()) {
+        if ($editId) {
+            $sql->setTable($selectedTable);
+            $sql->setWhere(['id' => $editId]);
+            $sql->select();
+        }
+        
+        if (!$editId || $sql->getRows()) {
             $editForm = '
             <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
-                <input type="hidden" name="record_action" value="save">
-                <input type="hidden" name="record_id" value="' . $editId . '">
+                <input type="hidden" name="record_action" value="' . ($editId ? 'save' : 'create') . '">
+                ' . ($editId ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
                 ' . rex_csrf_token::factory('table_records')->getHiddenField();
             
             foreach ($columns as $column) {
                 if ($column['name'] === 'id') continue;
                 
                 $label = ucfirst(str_replace('_', ' ', $column['name']));
-                $value = $sql->getValue($column['name']);
+                $value = $editId ? $sql->getValue($column['name']) : '';
                 
                 if (str_contains($column['type'], 'text')) {
                     $editForm .= '
@@ -237,12 +252,12 @@ if ($selectedTable) {
             }
             
             $editForm .= '
-                <button type="submit" class="btn btn-save">Speichern</button>
+                <button type="submit" class="btn btn-save">' . ($editId ? 'Speichern' : 'Erstellen') . '</button>
                 <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
             </form>';
             
             $fragment = new rex_fragment();
-            $fragment->setVar('title', 'Datensatz bearbeiten');
+            $fragment->setVar('title', $editId ? 'Datensatz bearbeiten' : 'Neuer Datensatz');
             $fragment->setVar('body', $editForm, false);
             $content .= $fragment->parse('core/page/section.php');
         }
