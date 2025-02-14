@@ -95,7 +95,7 @@ if (rex_post('generate', 'boolean') || rex_post('test_query', 'boolean')) {
 // Build form
 $formContent = '
 <form id="querybuilder" action="' . rex_url::currentBackendPage() . '" method="get">
-    <input type="hidden" name="page" value="table_builder/query">
+    <input type="hidden" name="page" value="manage_sql/query">
     <div class="row">
         <div class="col-sm-6">
             <div class="form-group">

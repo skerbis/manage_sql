@@ -25,7 +25,7 @@ Table Builder ist ein REDAXO-AddOn zur vereinfachten Arbeit mit Datenbanktabelle
 
 ## Installation
 
-1. Im REDAXO-Installer das AddOn "table_builder" herunterladen
+1. Im REDAXO-Installer das AddOn "manage_sql" herunterladen
 2. Installation und Aktivierung durchführen
 3. Rechte für Administratoren setzen
 
@@ -93,7 +93,7 @@ class Example extends rex_yform_manager_dataset
 ## Unterstützung & Bugs
 
 Fehler bitte im GitHub-Repository melden:
-https://github.com/alexplusde/table_builder
+https://github.com/alexplusde/manage_sql
 
 ## Lizenz
 
