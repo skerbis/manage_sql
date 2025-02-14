@@ -262,17 +262,17 @@ if ($selectedTable) {
         $list->addColumn('edit', '', -1, ['<th></th>', '<td class="rex-table-action">###VALUE###</td>']);
         $list->setColumnFormat('edit', 'custom', function ($params) {
             $url = rex_url::currentBackendPage([
-                'table' => $params['list']->getTableName(),
+                'table' => $selectedTable,
                 'edit_id' => $params['list']->getValue('id')
             ]);
             return '<a href="' . $url . '" class="rex-link-expanded"><i class="rex-icon fa-edit"></i> Bearbeiten</a>';
         });
         
         $list->addColumn('delete', '', -1, ['<th></th>', '<td class="rex-table-action">###VALUE###</td>']);
-        $list->setColumnFormat('delete', 'custom', function ($params) {
+        $list->setColumnFormat('delete', 'custom', function ($params) use ($selectedTable) {
             $token = rex_csrf_token::factory('table_records');
             $url = rex_url::currentBackendPage([
-                'table' => $params['list']->getTableName(),
+                'table' => $selectedTable,
                 'record_action' => 'delete',
                 'record_id' => $params['list']->getValue('id')
             ]) . '&' . $token->getUrlParams();
