@@ -313,8 +313,9 @@ if ($selectedTable) {
     $fragment->setVar('title', 'Aktionen');
     $fragment->setVar('body', $actionContent, false);
     $content .= $fragment->parse('core/page/section.php');
-
-   // Records list 
+    // Records list 
+    $listQuery = rex_sql::factory();
+    $listQuery->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
     $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
     
     // Add actions column
@@ -361,7 +362,7 @@ if ($selectedTable) {
         if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
             $list->setColumnFormat($name, 'custom', function ($params) {
                 $value = $params['value'];
-                if (strlen($value) > 100) {
+                if ($value && strlen($value) > 100) {
                     $value = substr($value, 0, 100) . '...';
                 }
                 return rex_escape($value);
@@ -372,7 +373,7 @@ if ($selectedTable) {
         if (strpos($column['type'], 'datetime') !== false) {
             $list->setColumnFormat($name, 'custom', function ($params) {
                 $value = $params['value'];
-                if ($value) {
+                if ($value && $value != '0000-00-00 00:00:00') {
                     return rex_formatter::strftime(strtotime($value), 'datetime');
                 }
                 return '';
@@ -389,7 +390,7 @@ if ($selectedTable) {
 
     // Wrap table in custom wrapper div
     $list->addTableAttribute('class', 'table-striped');
-    $tableContent = '<div class="table-wrapper">' . $list->get() . '</div>';
+    $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
     
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Datensätze');
@@ -439,18 +440,19 @@ if ($selectedTable) {
                     $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
-                        <input type="datetime-local" name="data[' . $column['name'] . ']" value="' . ($value ? date('Y-m-d\TH:i', strtotime($value)) : '') . '" class="form-control">
+                        <input type="datetime-local" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00 00:00:00' ? date('Y-m-d\TH:i', strtotime($value)) : '') . '" class="form-control">
                     </div>';
                 } elseif (strpos($column['type'], 'date') !== false) {
                     $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
-                        <input type="date" name="data[' . $column['name'] . ']" value="' . ($value ? date('Y-m-d', strtotime($value)) : '') . '" class="form-control">
+                        <input type="date" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00' ? date('Y-m-d', strtotime($value)) : '') . '" class="form-control">
                     </div>';
                 } elseif (strpos($column['type'], 'tinyint(1)') !== false) {
                     $editForm .= '
                     <div class="form-group">
                         <label class="checkbox">
+                            <input type="hidden" name="data[' . $column['name'] . ']" value="0">
                             <input type="checkbox" name="data[' . $column['name'] . ']" value="1"' . ($value ? ' checked' : '') . '>
                             ' . $label . '
                         </label>
@@ -493,7 +495,6 @@ if ($selectedTable) {
     <style>
         .table-wrapper {
             position: relative;
-            overflow-x: auto;
             margin-bottom: 0;
             border: 0;
         }
@@ -534,3 +535,5 @@ if ($selectedTable) {
         }
     </style>';
 }
+
+echo $content;
