@@ -3,6 +3,9 @@ $content = '';
 $message = '';
 $error = '';
 
+// Debug-Modus
+$debug = true; // Auf 'false' setzen, wenn du keine Debug-Ausgaben mehr sehen möchtest
+
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
@@ -70,6 +73,18 @@ if ($action && !$csrfToken->isValid()) {
                 $searchColumn = rex_post('search_column', 'string');
                 $searchTerm = rex_post('search_term', 'string');
                 $searchType = rex_post('search_type', 'string');
+
+                if ($debug) {
+                    echo '<pre>';
+                    echo '<b>Debug Delete Results:</b><br>';
+                    echo 'searchColumn: ';
+                    var_dump($searchColumn);
+                    echo 'searchTerm: ';
+                    var_dump($searchTerm);
+                    echo 'searchType: ';
+                    var_dump($searchType);
+                    echo '</pre>';
+                }
                 
                 if ($searchColumn && $searchTerm) {
                     $where = '';
@@ -90,10 +105,41 @@ if ($action && !$csrfToken->isValid()) {
                             $where = $searchColumn . ' LIKE :term';
                             $searchTerm = '%' . $searchTerm . '%';
                     }
+
                     $params['term'] = $searchTerm;
+
+                    if ($debug) {
+                        echo '<pre>';
+                        echo '<b>Debug Delete Results - Before SQL:</b><br>';
+                        echo '$where: ';
+                        var_dump($where);
+                        echo '$params: ';
+                        var_dump($params);
+                        echo '</pre>';
+                    }
                     
-                    $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
-                    $message = $sql->getRows() . ' Datensätze gelöscht.';
+                    try {
+                        $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+
+                        if ($debug) {
+                            echo '<pre>';
+                            echo '<b>Debug Delete Results - After SQL:</b><br>';
+                            echo '$sql->getRows(): ';
+                            var_dump($sql->getRows());
+                            echo '</pre>';
+                        }
+
+                        $message = $sql->getRows() . ' Datensätze gelöscht.';
+
+                    } catch (rex_sql_exception $e) {
+                        if ($debug) {
+                            echo '<pre>';
+                            echo '<b>Debug Delete Results - SQL Exception:</b><br>';
+                            echo $e->getMessage();
+                            echo '</pre>';
+                        }
+                        $error = $e->getMessage();
+                    }
                 }
                 break;
 
@@ -141,7 +187,21 @@ if ($recordAction && $recordId && $csrfToken->isValid()) {
     try {
         switch ($recordAction) {
             case 'delete':
+                if ($debug) {
+                   echo '<pre>';
+                    echo '<b>Debug Single Record Delete:</b><br>';
+                    echo 'recordId: ';
+                    var_dump($recordId);
+                    echo '</pre>';
+                 }
                 $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
+                 if ($debug) {
+                    echo '<pre>';
+                    echo '<b>Debug Single Record Delete After SQL:</b><br>';
+                    echo '$sql->getRows(): ';
+                    var_dump($sql->getRows());
+                    echo '</pre>';
+                }
                 $message = 'Datensatz gelöscht.';
                 break;
         }
