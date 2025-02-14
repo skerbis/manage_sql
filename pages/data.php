@@ -72,12 +72,18 @@ $formContent .= '
 </form>';
 
 if ($selectedTable) {
+    // Remove "rex_" prefix for YForm
+    $yformTable = preg_replace('/^rex_/', '', $selectedTable);
+    
     $formContent .= '
     <div class="row" style="margin-bottom: 20px;">
         <div class="col-sm-12">
             <div class="btn-toolbar">
                 <div class="btn-group">
-                    <a href="index.php?page=yform/manager/data_edit&table_name='.$selectedTable.'&func=add" class="btn btn-success">
+                    <a href="'.rex_url::backendPage('yform/manager/data_edit', [
+                        'table_name' => $yformTable,
+                        'func' => 'add'
+                    ]).'" class="btn btn-success">
                         <i class="rex-icon fa-plus"></i> Neuer Datensatz
                     </a>
                 </div>
@@ -139,7 +145,12 @@ if ($selectedTable) {
 
         // Add action column
         $list->addColumn('Aktionen', '<i class="rex-icon fa-edit"></i> Bearbeiten', -1, ['<th class="rex-table-action">###VALUE###</th>', '<td class="rex-table-action">###VALUE###</td>']);
-        $list->setColumnParams('Aktionen', ['page' => 'yform/manager/data_edit', 'func' => 'edit', 'table_name' => $selectedTable, 'data_id' => '###id###']);
+        $list->setColumnParams('Aktionen', [
+            'page' => 'yform/manager/data_edit',
+            'func' => 'edit',
+            'table_name' => $yformTable,
+            'data_id' => '###id###'
+        ]);
         
         // Wrap list in responsive container
         $content .= '<div class="table-responsive">';
