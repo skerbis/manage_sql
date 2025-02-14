@@ -1,6 +1,6 @@
 <?php
 
-class rex_table_builder
+class manage_sql
 {
     private rex_sql_table $table;
     private string $name;

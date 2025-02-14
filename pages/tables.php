@@ -92,26 +92,26 @@ $list->setColumnFormat('actions', 'custom', function ($params) use ($coreTables,
                 <a href="'.rex_url::backendPage('yform/manager/data_edit', ['table_name' => $tableName]).'" class="btn btn-default btn-xs" title="In YForm öffnen">
                     <i class="rex-icon fa-yform"></i> YForm
                 </a>
-                <a href="'.rex_url::backendPage('table_builder/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
-                    <i class="rex-icon fa-code"></i> SQL
+                <a href="'.rex_url::backendPage('manage_sql/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
+                    <i class="rex-icon fa-code"></i> REX_SQL_TABLE
                 </a>
             </div>';
         }
         return '
         <div class="btn-group">
-            <a href="'.rex_url::backendPage('table_builder/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
-                <i class="rex-icon fa-code"></i> SQL
+            <a href="'.rex_url::backendPage('manage_sql/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
+                <i class="rex-icon fa-code"></i> REX_SQL_TABLE
             </a>
         </div>';
     }
     
     return '
     <div class="btn-group">
-        <a href="'.rex_url::backendPage('table_builder/edit', ['table' => $tableName]).'" class="btn btn-edit btn-xs" title="Bearbeiten">
+        <a href="'.rex_url::backendPage('manage_sql/edit', ['table' => $tableName]).'" class="btn btn-edit btn-xs" title="Bearbeiten">
             <i class="rex-icon fa-edit"></i> Bearbeiten
         </a>
-        <a href="'.rex_url::backendPage('table_builder/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
-            <i class="rex-icon fa-code"></i> SQL
+        <a href="'.rex_url::backendPage('manage_sql/sql', ['table' => $tableName]).'" class="btn btn-default btn-xs" title="SQL anzeigen">
+            <i class="rex-icon fa-code"></i> REX_SQL_TABLE
         </a>
     </div>';
 });
@@ -143,7 +143,7 @@ $content .= $fragment->parse('core/page/section.php');
 
 // Add "Create Table" button at the bottom
 $buttons = '
-<a class="btn btn-save" href="'.rex_url::backendPage('table_builder/create').'">
+<a class="btn btn-save" href="'.rex_url::backendPage('manage_sql/create').'">
     <i class="rex-icon fa-plus"></i> Neue Tabelle erstellen
 </a>';
 

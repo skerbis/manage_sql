@@ -41,7 +41,7 @@ if ($table = rex_get('table', 'string')) {
                     <a href="'.rex_url::currentBackendPage(['table' => $tableName]).'" class="btn btn-default" title="SQL anzeigen">
                         <i class="rex-icon fa-code"></i> SQL Schema anzeigen
                     </a>
-                    <a href="index.php?page=table_builder/edit&table='.$tableName.'" class="btn btn-edit" title="Tabelle bearbeiten">
+                    <a href="index.php?page=manage_sql/edit&table='.$tableName.'" class="btn btn-edit" title="Tabelle bearbeiten">
                         <i class="rex-icon fa-edit"></i> Bearbeiten
                     </a>
                 </div>

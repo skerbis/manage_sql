@@ -108,7 +108,7 @@ foreach ($columns as $column) {
                         <label>Typ:</label>
                         <select name="columns['.$name.'][type]" class="form-control">';
                         
-foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
+foreach (manage_sql::getCommonColumnTypes() as $type => $label) {
     $formContent .= '<option value="'.$type.'"'.($column->getType() === $type ? ' selected' : '').'>'.$label.'</option>';
 }
 
@@ -157,7 +157,7 @@ $newColumnForm = '<div class="column-row panel panel-info">
                 <div class="form-group">
                     <label>Typ:</label>
                     <select name="new_column[type]" class="form-control">';
-foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
+foreach (manage_sql::getCommonColumnTypes() as $type => $label) {
     $newColumnForm .= '<option value="'.$type.'">'.$label.'</option>';
 }
 $newColumnForm .= '</select>
@@ -193,7 +193,7 @@ $fragment->setVar('body', '
             <div class="rex-form-panel-footer">
                 <div class="btn-toolbar">
                     <button type="submit" name="updatetable" value="1" class="btn btn-save">Speichern</button>
-                    <a class="btn btn-default" href="'.rex_url::backendPage('table_builder/tables').'">Abbrechen</a>
+                    <a class="btn btn-default" href="'.rex_url::backendPage('manage_sql/tables').'">Abbrechen</a>
                 </div>
             </div>
         </div>

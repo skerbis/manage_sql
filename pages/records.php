@@ -232,7 +232,7 @@ if ($message) {
 // Table selection form
 $formContent = '
 <form id="table-select" action="' . rex_url::currentBackendPage() . '" method="get">
-    <input type="hidden" name="page" value="table_builder/records">
+    <input type="hidden" name="page" value="manage_sql/records">
     <div class="row">
         <div class="col-sm-6">
             <div class="form-group">

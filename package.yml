@@ -1,4 +1,4 @@
-package: table_builder
+package: manage_sql
 version: '1.0.0'
 author: Your Name
 supportpage: https://github.com/your/repo

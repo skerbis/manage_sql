@@ -27,7 +27,7 @@ if ($selectedTable && in_array($selectedTable, $yformTables)) {
 // 4. Formular zum Auswählen der YForm-Tabelle erstellen
 $formContent = '
 <form id="yormbuilder" action="' . rex_url::currentBackendPage() . '" method="get">
-    <input type="hidden" name="page" value="table_builder/yorm">
+    <input type="hidden" name="page" value="manage_sql/yorm">
     <div class="row">
         <div class="col-sm-6">
             <div class="form-group">

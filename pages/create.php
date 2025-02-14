@@ -17,7 +17,7 @@ if (rex_post('createtable', 'boolean')) {
         }
         
         try {
-            $builder = new rex_table_builder($tableName);
+            $builder = new manage_sql($tableName);
             
             if ($builder->exists()) {
                 $error = 'Die Tabelle existiert bereits.';
@@ -42,7 +42,7 @@ if (rex_post('createtable', 'boolean')) {
                     
                     // Generate and show SQL schema
                     $schema = $builder->exportSchema();
-                    rex_set_session('table_builder_schema', $schema);
+                    rex_set_session('manage_sql_schema', $schema);
                     
                     // Redirect to success page
                     rex_response::sendRedirect(rex_url::currentBackendPage(['info' => 'table_created']));
@@ -59,7 +59,7 @@ if (rex_post('createtable', 'boolean')) {
 // Show message from redirect
 if (rex_get('info') == 'table_created') {
     $message = 'Tabelle wurde erfolgreich erstellt.';
-    $schema = rex_session('table_builder_schema', 'string');
+    $schema = rex_session('manage_sql_schema', 'string');
 }
 
 // Generate form
@@ -85,7 +85,7 @@ $columnTemplate = '
         <div class="col-sm-3">
             <div class="form-group">
                 <select name="columns[{{index}}][type]" class="form-control">';
-foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
+foreach (manage_sql::getCommonColumnTypes() as $type => $label) {
     $columnTemplate .= '<option value="' . $type . '">' . $label . '</option>';
 }
 $columnTemplate .= '
