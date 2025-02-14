@@ -161,10 +161,127 @@ $fragment->setVar('title', 'Tabelle auswählen');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
+// Handle record actions
+if ($selectedTable && rex_request('record_action', 'string')) {
+    $recordId = rex_request('record_id', 'int');
+    
+    if ($recordId) {
+        try {
+            $sql = rex_sql::factory();
+            
+            switch(rex_request('record_action', 'string')) {
+                case 'delete':
+                    if (rex_csrf_token::factory('table_records')->isValid()) {
+                        $sql->setTable($selectedTable);
+                        $sql->setWhere(['id' => $recordId]);
+                        $sql->delete();
+                        $message = 'Datensatz wurde gelöscht.';
+                    }
+                    break;
+                
+                case 'save':
+                    if (rex_csrf_token::factory('table_records')->isValid()) {
+                        $sql->setTable($selectedTable);
+                        foreach (rex_post('data', 'array', []) as $key => $value) {
+                            $sql->setValue($key, $value);
+                        }
+                        $sql->setWhere(['id' => $recordId]);
+                        $sql->update();
+                        $message = 'Datensatz wurde gespeichert.';
+                    }
+                    break;
+            }
+        } catch (rex_sql_exception $e) {
+            $error = $e->getMessage();
+        }
+    }
+}
+
+// Show edit form if requested
+$editId = rex_request('edit_id', 'int');
+if ($selectedTable && $editId) {
+    $sql = rex_sql::factory();
+    $sql->setTable($selectedTable);
+    $sql->setWhere(['id' => $editId]);
+    $sql->select();
+    
+    if ($sql->getRows()) {
+        $editForm = '
+        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+            <input type="hidden" name="record_action" value="save">
+            <input type="hidden" name="record_id" value="' . $editId . '">
+            ' . rex_csrf_token::factory('table_records')->getHiddenField();
+        
+        $columns = rex_sql::showColumns($selectedTable);
+        foreach ($columns as $column) {
+            if ($column['name'] === 'id') continue;
+            
+            $label = ucfirst(str_replace('_', ' ', $column['name']));
+            $value = $sql->getValue($column['name']);
+            
+            if (str_contains($column['type'], 'text')) {
+                $editForm .= '
+                <div class="form-group">
+                    <label>' . $label . '</label>
+                    <textarea name="data[' . $column['name'] . ']" class="form-control" rows="3">' . rex_escape($value) . '</textarea>
+                </div>';
+            } else {
+                $editForm .= '
+                <div class="form-group">
+                    <label>' . $label . '</label>
+                    <input type="text" name="data[' . $column['name'] . ']" value="' . rex_escape($value) . '" class="form-control">
+                </div>';
+            }
+        }
+        
+        $editForm .= '
+            <button type="submit" class="btn btn-save">Speichern</button>
+            <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
+        </form>';
+        
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', 'Datensatz bearbeiten');
+        $fragment->setVar('body', $editForm, false);
+        $content .= $fragment->parse('core/page/section.php');
+        
+    } else {
+        $error = 'Datensatz nicht gefunden.';
+    }
+}
+
 // If table is selected, show actions
 if ($selectedTable) {
     $columns = rex_sql::showColumns($selectedTable);
     $columnNames = array_column($columns, 'name');
+    
+    // Show data table if not in edit mode
+    if (!$editId) {
+        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
+        
+        // Add edit/delete actions
+        $list->addColumn('edit', '', -1, ['<th></th>', '<td class="rex-table-action">###VALUE###</td>']);
+        $list->setColumnFormat('edit', 'custom', function ($params) {
+            $url = rex_url::currentBackendPage([
+                'table' => $params['list']->getTableName(),
+                'edit_id' => $params['list']->getValue('id')
+            ]);
+            return '<a href="' . $url . '" class="rex-link-expanded"><i class="rex-icon fa-edit"></i> Bearbeiten</a>';
+        });
+        
+        $list->addColumn('delete', '', -1, ['<th></th>', '<td class="rex-table-action">###VALUE###</td>']);
+        $list->setColumnFormat('delete', 'custom', function ($params) {
+            $token = rex_csrf_token::factory('table_records');
+            $url = rex_url::currentBackendPage([
+                'table' => $params['list']->getTableName(),
+                'record_action' => 'delete',
+                'record_id' => $params['list']->getValue('id')
+            ]) . '&' . $token->getUrlParams();
+            return '<a href="' . $url . '" class="rex-link-expanded" onclick="return confirm(\'Wirklich löschen?\')">'
+                . '<i class="rex-icon fa-trash"></i> Löschen</a>';
+        });
+        
+        $content .= $list->get();
+    }
     
     // Search form
     $searchForm = '
