@@ -10,15 +10,17 @@ $debug = true; // Auf 'false' setzen, wenn du keine Debug-Ausgaben mehr sehen m�
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
 
-// CSRF protection
-$csrfToken = rex_csrf_token::factory('table_records');
+// CSRF protection - erstmal auskommentiert für Debug
+// $csrfToken = rex_csrf_token::factory('table_records');
 
 // Handle actions when form is submitted
-if ($action && !$csrfToken->isValid()) {
-    $error = rex_i18n::msg('csrf_token_invalid');
-} elseif ($action) {
-    $sql = rex_sql::factory();
-    $sql->setDebug(false);
+if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
+    // if ($action && !$csrfToken->isValid()) { //CSRF wieder aktivieren
+    //     $error = rex_i18n::msg('csrf_token_invalid');
+    // }
+   //  elseif ($action) {
+        $sql = rex_sql::factory();
+        $sql->setDebug(false);
     
     try {
         switch ($action) {
@@ -177,25 +179,27 @@ if ($action && !$csrfToken->isValid()) {
     }
 }
 
-// Handle single record actions 
+// Handle single record actions
 $recordAction = rex_get('record_action', 'string');
 $recordId = rex_get('record_id', 'int');
 
-if ($recordAction && $recordId && $csrfToken->isValid()) {
+if ($recordAction && $recordId /*&& $csrfToken->isValid()*/) {
+    // if ($recordAction && $recordId && $csrfToken->isValid()) { // CSRF wieder aktivieren
+
     $sql = rex_sql::factory();
-    
+
     try {
         switch ($recordAction) {
             case 'delete':
                 if ($debug) {
-                   echo '<pre>';
+                    echo '<pre>';
                     echo '<b>Debug Single Record Delete:</b><br>';
                     echo 'recordId: ';
                     var_dump($recordId);
                     echo '</pre>';
-                 }
+                }
                 $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
-                 if ($debug) {
+                if ($debug) {
                     echo '<pre>';
                     echo '<b>Debug Single Record Delete After SQL:</b><br>';
                     echo '$sql->getRows(): ';
@@ -213,7 +217,7 @@ if ($recordAction && $recordId && $csrfToken->isValid()) {
 // Get all tables
 $sql = rex_sql::factory();
 $tables = $sql->getTablesAndViews();
-$tables = array_filter($tables, function($table) {
+$tables = array_filter($tables, function ($table) {
     return str_starts_with($table, 'rex_');
 });
 
@@ -249,7 +253,7 @@ $content .= $fragment->parse('core/page/section.php');
 if ($selectedTable) {
     $columns = rex_sql::showColumns($selectedTable);
     $columnNames = array_column($columns, 'name');
-    
+
     // Accordion for actions
     $actionContent = '
     <div class="panel-group" id="accordion" role="tablist">
@@ -288,7 +292,7 @@ if ($selectedTable) {
                                     <input type="text" name="search_term" class="form-control" required>
                                     <span class="input-group-btn">
                                         <button type="submit" class="btn btn-primary"><i class="rex-icon fa-search"></i></button>
-                                        <button type="submit" name="action" value="delete_results" class="btn btn-danger" 
+                                        <button type="submit" name="action" value="delete_results" class="btn btn-danger"
                                             onclick="return confirm(\'Gefundene Datensätze wirklich löschen?\')">
                                             <i class="rex-icon fa-trash"></i>
                                         </button>
@@ -296,7 +300,7 @@ if ($selectedTable) {
                                 </div>
                             </div>
                         </div>
-                        ' . $csrfToken->getHiddenField() . '
+                        ' /*. $csrfToken->getHiddenField()*/ . '
                     </form>
                 </div>
             </div>
@@ -338,7 +342,7 @@ if ($selectedTable) {
                                 </div>
                             </div>
                         </div>
-                        ' . $csrfToken->getHiddenField() . '
+                        ' /*. $csrfToken->getHiddenField() */. '
                     </form>
                 </div>
             </div>
@@ -362,7 +366,7 @@ if ($selectedTable) {
                         <button type="submit" class="btn btn-danger" onclick="return confirm(\'Tabelle wirklich leeren?\')">
                             <i class="rex-icon fa-trash"></i> Tabelle leeren (TRUNCATE)
                         </button>
-                        ' . $csrfToken->getHiddenField() . '
+                        ' /*. $csrfToken->getHiddenField() */. '
                     </form>
                 </div>
             </div>
@@ -373,11 +377,11 @@ if ($selectedTable) {
     $fragment->setVar('title', 'Aktionen');
     $fragment->setVar('body', $actionContent, false);
     $content .= $fragment->parse('core/page/section.php');
-    // Records list 
+    // Records list
     $listQuery = rex_sql::factory();
     $listQuery->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
     $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
-    
+
     // Add actions column
     $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
     $list->setColumnPosition('_actions', 0);
@@ -392,13 +396,13 @@ if ($selectedTable) {
             'func' => 'add',
             'id' => $params['list']->getValue('id')
         ]);
-        
+
         $deleteUrl = rex_url::currentBackendPage([
             'table' => $selectedTable,
             'record_action' => 'delete',
             'record_id' => $params['list']->getValue('id')
-        ]) . '&' . $csrfToken->getUrlParams();
-        
+        ]) /*. '&' . $csrfToken->getUrlParams()*/;
+
         return '
         <div class="btn-group">
             <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
@@ -428,7 +432,7 @@ if ($selectedTable) {
                 return rex_escape($value);
             });
         }
-        
+
         // Format dates
         if (strpos($column['type'], 'datetime') !== false) {
             $list->setColumnFormat($name, 'custom', function ($params) {
@@ -451,7 +455,7 @@ if ($selectedTable) {
     // Wrap table in custom wrapper div
     $list->addTableAttribute('class', 'table-striped');
     $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
-    
+
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Datensätze');
     $fragment->setVar('content', $tableContent, false);
@@ -469,26 +473,26 @@ if ($selectedTable) {
     // Show edit/add form if requested
     if ($editId || $addMode) {
         $sql = rex_sql::factory();
-        
+
         if ($editId) {
             $sql->setTable($selectedTable);
             $sql->setWhere(['id' => $editId]);
             $sql->select();
         }
-        
+
         if (!$editId || $sql->getRows()) {
             $editForm = '
             <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
                 <input type="hidden" name="action" value="' . ($addMode ? 'create' : 'save') . '">
                 ' . ($editId && !$addMode ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
-                ' . $csrfToken->getHiddenField();
-            
+                ' /*. $csrfToken->getHiddenField()*/;
+
             foreach ($columns as $column) {
                 if ($column['name'] === 'id') continue;
-                
+
                 $label = ucfirst(str_replace('_', ' ', $column['name']));
                 $value = $editId ? $sql->getValue($column['name']) : '';
-                
+
                 // Different input types based on column type
                 if (strpos($column['type'], 'text') !== false) {
                     $editForm .= '
@@ -525,14 +529,14 @@ if ($selectedTable) {
                     </div>';
                 }
             }
-            
+
             $editForm .= '
                 <div class="btn-toolbar">
                     <button type="submit" class="btn btn-save">' . ($addMode ? 'Erstellen' : 'Speichern') . '</button>
                     <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
                 </div>
             </form>';
-            
+
             $fragment = new rex_fragment();
             $fragment->setVar('title', $addMode ? 'Neuer Datensatz' : 'Datensatz bearbeiten');
             $fragment->setVar('body', $editForm, false);
