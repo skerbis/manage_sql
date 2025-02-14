@@ -28,7 +28,7 @@ page:
             title: 'YORM Generator'
             icon: rex-icon fa-code
         sql:
-            title: 'SQL Export'
+            title: 'REX SQLTable'
             icon: rex-icon fa-code
             itemclass: pull-right
         edit:
@@ -36,5 +36,5 @@ page:
             icon: rex-icon fa-edit
             hidden: true
         records:
-            title: 'Hausmeister'
-            icon: rex-icon fa-edit 
+            title: 'Data Manager'
+            icon: rex-icon fa-table-cells
