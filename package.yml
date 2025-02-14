@@ -35,6 +35,6 @@ page:
             title: 'Tabelle bearbeiten'
             icon: rex-icon fa-edit
             hidden: true
-        beholder:
+        data:
             title: 'Hausmeister'
             icon: rex-icon fa-edit
