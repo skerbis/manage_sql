@@ -173,16 +173,26 @@ if ($selectedTable) {
     $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
     $list->setColumnPosition('_actions', 0);
     $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
+        $id = $params['list']->getValue('id'); // Get the ID of the current record
         $token = rex_csrf_token::factory('table_records');
+
         $editUrl = rex_url::backendPage('table_builder/records', [
             'table' => $selectedTable,
-            'edit_id' => $params['list']->getValue('id')
+            'edit_id' => $id
         ]);
-        $deleteUrl = rex_url::backendPage('table_builder/records', [
+
+        // Generate the delete URL correctly, including the CSRF token.
+        $deleteUrl = rex_url::currentBackendPage([ // Use currentBackendPage to preserve other GET params
             'table' => $selectedTable,
             'record_action' => 'delete',
-            'record_id' => $params['list']->getValue('id')
-        ]) . '&' . $token->getUrlParams();
+            'record_id' => $id,
+            ...$token->getUrlParamsAsArray(), // Use getUrlParamsAsArray to merge token params
+        ]);
+
+        // Debugging: Output the generated URLs and token validity
+        dump('Edit URL: ' . $editUrl);
+        dump('Delete URL: ' . $deleteUrl);
+        dump('Is CSRF Token Valid (in URL Generation): ' . $token->isValid()); //Check during generation
 
         return '
         <div class="btn-group">
@@ -340,7 +350,7 @@ if ($selectedTable) {
                 $sql->insert();
                 $message = 'Datensatz erfolgreich erstellt.';
             } catch (Exception $e) {
-                $error = 'Fehler beim Erstellen des Datensatzes: ' . $e->getMessage();
+                $error = 'Fehler beim Erstellen des Datensatzes: 'e->getMessage();
             }
         }
         // Redirect, um das Formular zu leeren und die Änderungen anzuzeigen
@@ -354,7 +364,9 @@ if ($selectedTable) {
     }
 
     // ** 2. DELETE **
-    if ($recordAction === 'delete' && $token->isValid()) {
+    if ($recordAction === 'delete' && rex_csrf_token::factory('table_records')->isValid()) {  //Revalidate!
+        $recordId = rex_get('record_id', 'int'); // Get record_id safely
+
         $sql = rex_sql::factory();
         $sql->setTable($selectedTable);
         $sql->setWhere(['id' => $recordId]);
@@ -373,6 +385,8 @@ if ($selectedTable) {
                  window.location.href = "' . rex_url::currentBackendPage(['table' => $selectedTable]) . '";
               </script>';
         exit(); //Wichtig, um weiteren Output zu verhindern
+    }  else {
+            dump("CSRF Token invalid or recordAction is not delete!");
     }
 
     // ** 3. SEARCH **
@@ -411,16 +425,21 @@ if ($selectedTable) {
         $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
         $list->setColumnPosition('_actions', 0);
         $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
+            $id = $params['list']->getValue('id'); // Get the ID of the current record
             $token = rex_csrf_token::factory('table_records');
+
             $editUrl = rex_url::backendPage('table_builder/records', [
                 'table' => $selectedTable,
-                'edit_id' => $params['list']->getValue('id')
+                'edit_id' => $id
             ]);
-            $deleteUrl = rex_url::backendPage('table_builder/records', [
+
+            // Generate the delete URL correctly, including the CSRF token.
+            $deleteUrl = rex_url::currentBackendPage([ // Use currentBackendPage to preserve other GET params
                 'table' => $selectedTable,
                 'record_action' => 'delete',
-                'record_id' => $params['list']->getValue('id')
-            ]) . '&' . $token->getUrlParams();
+                'record_id' => $id,
+                ...$token->getUrlParamsAsArray(), // Use getUrlParamsAsArray to merge token params
+            ]);
 
             return '
             <div class="btn-group">
@@ -472,10 +491,9 @@ if ($selectedTable) {
                 $whereClause = "`$searchColumn` LIKE '%$searchTerm%'"; // Default: Contains
         }
 
-        $sql->setWhere($whereClause);
-
         try {
-            $sql->delete();
+            // Delete all records that match the search criteria
+            $sql->setQuery("DELETE FROM `$selectedTable` WHERE " . $whereClause);
             $message = 'Gefundene Datensätze erfolgreich gelöscht.';
         } catch (Exception $e) {
             $error = 'Fehler beim Löschen der Datensätze: ' . $e->getMessage();
