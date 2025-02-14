@@ -533,3 +533,4 @@ if ($selectedTable) {
             }
         }
     </style>';
+}
