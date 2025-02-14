@@ -4,7 +4,7 @@ $message = '';
 $error = '';
 
 // Debug-Modus
-$debug = true; // Auf 'false' setzen, wenn du keine Debug-Ausgaben mehr sehen möchtest
+$debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
@@ -249,271 +249,55 @@ $fragment->setVar('title', 'Tabelle auswählen');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
-// If table is selected
-if ($selectedTable) {
-    $columns = rex_sql::showColumns($selectedTable);
-    $columnNames = array_column($columns, 'name');
+// Check if we're in edit mode
+$editId = rex_request('edit_id', 'int', 0);
+$addMode = rex_get('func') === 'add';
 
-    // Accordion for actions
-    $actionContent = '
-    <div class="panel-group" id="accordion" role="tablist">
-        <div class="panel panel-default">
-            <div class="panel-heading" role="tab" id="headingOne">
-                <h4 class="panel-title">
-                    <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseSearch">
-                        <i class="rex-icon fa-search"></i> Suchen
-                    </a>
-                </h4>
-            </div>
-            <div id="collapseSearch" class="panel-collapse collapse">
-                <div class="panel-body">
-                    <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
-                        <input type="hidden" name="action" value="search">
-                        <div class="row">
-                            <div class="col-sm-4">
-                                <select name="search_column" class="form-control" required>
-                                    <option value="">Spalte wählen...</option>';
-    foreach ($columnNames as $column) {
-        $actionContent .= '<option value="' . $column . '">' . $column . '</option>';
-    }
-    $actionContent .= '
-                                </select>
-                            </div>
-                            <div class="col-sm-4">
-                                <select name="search_type" class="form-control">
-                                    <option value="contains">Enthält</option>
-                                    <option value="exact">Exakt</option>
-                                    <option value="starts">Beginnt mit</option>
-                                    <option value="ends">Endet mit</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-4">
-                                <div class="input-group">
-                                    <input type="text" name="search_term" class="form-control" required>
-                                    <span class="input-group-btn">
-                                        <button type="submit" class="btn btn-primary"><i class="rex-icon fa-search"></i></button>
-                                        <button type="submit" name="action" value="delete_results" class="btn btn-danger"
-                                            onclick="return confirm(\'Gefundene Datensätze wirklich löschen?\')">
-                                            <i class="rex-icon fa-trash"></i>
-                                        </button>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        ' /*. $csrfToken->getHiddenField()*/ . '
-                    </form>
-                </div>
-            </div>
-        </div>
+// Show edit/add form if requested
+if ($editId || $addMode) {
+    $sql = rex_sql::factory();
 
-        <div class="panel panel-default">
-            <div class="panel-heading" role="tab" id="headingTwo">
-                <h4 class="panel-title">
-                    <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseReplace">
-                        <i class="rex-icon fa-exchange"></i> Ersetzen
-                    </a>
-                </h4>
-            </div>
-            <div id="collapseReplace" class="panel-collapse collapse">
-                <div class="panel-body">
-                    <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
-                        <input type="hidden" name="action" value="replace">
-                        <div class="row">
-                            <div class="col-sm-4">
-                                <select name="replace_column" class="form-control" required>
-                                    <option value="">Spalte wählen...</option>';
-    foreach ($columnNames as $column) {
-        $actionContent .= '<option value="' . $column . '">' . $column . '</option>';
-    }
-    $actionContent .= '
-                                </select>
-                            </div>
-                            <div class="col-sm-4">
-                                <input type="text" name="search_term" class="form-control" placeholder="Suchen nach..." required>
-                            </div>
-                            <div class="col-sm-4">
-                                <div class="input-group">
-                                    <input type="text" name="replace_term" class="form-control" placeholder="Ersetzen durch..." required>
-                                    <span class="input-group-btn">
-                                        <button type="submit" class="btn btn-primary" onclick="return confirm(\'Ersetzen wirklich durchführen?\')">
-                                            <i class="rex-icon fa-exchange"></i>
-                                        </button>
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        ' /*. $csrfToken->getHiddenField() */. '
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel panel-default">
-            <div class="panel-heading" role="tab" id="headingThree">
-                <h4 class="panel-title">
-                    <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseTruncate">
-                        <i class="rex-icon fa-trash"></i> Tabelle leeren
-                    </a>
-                </h4>
-            </div>
-            <div id="collapseTruncate" class="panel-collapse collapse">
-                <div class="panel-body">
-                    <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
-                        <input type="hidden" name="action" value="truncate">
-                        <p class="alert alert-warning">
-                            Diese Aktion löscht <strong>alle</strong> Datensätze aus der Tabelle. Dies kann nicht rückgängig gemacht werden!
-                        </p>
-                        <button type="submit" class="btn btn-danger" onclick="return confirm(\'Tabelle wirklich leeren?\')">
-                            <i class="rex-icon fa-trash"></i> Tabelle leeren (TRUNCATE)
-                        </button>
-                        ' /*. $csrfToken->getHiddenField() */. '
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>';
-
-    $fragment = new rex_fragment();
-    $fragment->setVar('title', 'Aktionen');
-    $fragment->setVar('body', $actionContent, false);
-    $content .= $fragment->parse('core/page/section.php');
-    // Records list
-    $listQuery = rex_sql::factory();
-    $listQuery->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
-    $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
-
-    // Add actions column
-    $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
-    $list->setColumnPosition('_actions', 0);
-    $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
-        $editUrl = rex_url::currentBackendPage([
-            'table' => $selectedTable,
-            'edit_id' => $params['list']->getValue('id')
-        ]);
-
-        $copyUrl = rex_url::currentBackendPage([
-            'table' => $selectedTable,
-            'func' => 'add',
-            'id' => $params['list']->getValue('id')
-        ]);
-
-        $deleteUrl = rex_url::currentBackendPage([
-            'table' => $selectedTable,
-            'record_action' => 'delete',
-            'record_id' => $params['list']->getValue('id')
-        ]) /*. '&' . $csrfToken->getUrlParams()*/;
-
-        return '
-        <div class="btn-group">
-            <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
-                <i class="rex-icon fa-edit"></i>
-            </a>
-            <a href="' . $copyUrl . '" class="btn btn-default btn-xs" title="Kopieren">
-                <i class="rex-icon fa-copy"></i>
-            </a>
-            <a href="' . $deleteUrl . '" class="btn btn-delete btn-xs" onclick="return confirm(\'Wirklich löschen?\')" title="Löschen">
-                <i class="rex-icon fa-trash"></i>
-            </a>
-        </div>';
-    });
-
-    // Format columns based on data type
-    foreach ($columns as $column) {
-        $name = $column['name'];
-        if ($name === 'id') continue;
-
-        // Truncate text fields if too long
-        if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
-            $list->setColumnFormat($name, 'custom', function ($params) {
-                $value = $params['value'];
-                if ($value && strlen($value) > 100) {
-                    $value = substr($value, 0, 100) . '...';
-                }
-                return rex_escape($value);
-            });
-        }
-
-        // Format dates
-        if (strpos($column['type'], 'datetime') !== false) {
-            $list->setColumnFormat($name, 'custom', function ($params) {
-                $value = $params['value'];
-                if ($value && $value != '0000-00-00 00:00:00') {
-                    return rex_formatter::strftime(strtotime($value), 'datetime');
-                }
-                return '';
-            });
-        }
-
-        // Format boolean values
-        if (strpos($column['type'], 'tinyint(1)') !== false) {
-            $list->setColumnFormat($name, 'custom', function ($params) {
-                return $params['value'] ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
-            });
-        }
+    if ($editId) {
+        $sql->setTable($selectedTable);
+        $sql->setWhere(['id' => $editId]);
+        $sql->select();
     }
 
-    // Wrap table in custom wrapper div
-    $list->addTableAttribute('class', 'table-striped');
-    $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
-
-    $fragment = new rex_fragment();
-    $fragment->setVar('title', 'Datensätze');
-    $fragment->setVar('content', $tableContent, false);
-    $content .= $fragment->parse('core/page/section.php');
-
-    // Check if we're in edit mode
-    $editId = rex_request('edit_id', 'int', 0);
-    $addMode = rex_get('func') === 'add';
-
-    // If we're adding a new record based on an existing one, load that data
-    if ($addMode && ($copyId = rex_get('id', 'int'))) {
-        $editId = $copyId;
-    }
-
-    // Show edit/add form if requested
-    if ($editId || $addMode) {
-        $sql = rex_sql::factory();
-
-        if ($editId) {
-            $sql->setTable($selectedTable);
-            $sql->setWhere(['id' => $editId]);
-            $sql->select();
-        }
-
-        if (!$editId || $sql->getRows()) {
-            $editForm = '
+    if (!$editId || $sql->getRows()) {
+        $editForm = '
             <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
                 <input type="hidden" name="action" value="' . ($addMode ? 'create' : 'save') . '">
                 ' . ($editId && !$addMode ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
                 ' /*. $csrfToken->getHiddenField()*/;
 
-            foreach ($columns as $column) {
-                if ($column['name'] === 'id') continue;
+        $columns = rex_sql::showColumns($selectedTable);
+        foreach ($columns as $column) {
+            if ($column['name'] === 'id') continue;
 
-                $label = ucfirst(str_replace('_', ' ', $column['name']));
-                $value = $editId ? $sql->getValue($column['name']) : '';
+            $label = ucfirst(str_replace('_', ' ', $column['name']));
+            $value = $editId ? $sql->getValue($column['name']) : '';
 
-                // Different input types based on column type
-                if (strpos($column['type'], 'text') !== false) {
-                    $editForm .= '
+            // Different input types based on column type
+            if (strpos($column['type'], 'text') !== false) {
+                $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
                         <textarea name="data[' . $column['name'] . ']" class="form-control" rows="3">' . rex_escape($value) . '</textarea>
                     </div>';
-                } elseif (strpos($column['type'], 'datetime') !== false) {
-                    $editForm .= '
+            } elseif (strpos($column['type'], 'datetime') !== false) {
+                $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
                         <input type="datetime-local" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00 00:00:00' ? date('Y-m-d\TH:i', strtotime($value)) : '') . '" class="form-control">
                     </div>';
-                } elseif (strpos($column['type'], 'date') !== false) {
-                    $editForm .= '
+            } elseif (strpos($column['type'], 'date') !== false) {
+                $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
                         <input type="date" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00' ? date('Y-m-d', strtotime($value)) : '') . '" class="form-control">
                     </div>';
-                } elseif (strpos($column['type'], 'tinyint(1)') !== false) {
-                    $editForm .= '
+            } elseif (strpos($column['type'], 'tinyint(1)') !== false) {
+                $editForm .= '
                     <div class="form-group">
                         <label class="checkbox">
                             <input type="hidden" name="data[' . $column['name'] . ']" value="0">
@@ -521,28 +305,241 @@ if ($selectedTable) {
                             ' . $label . '
                         </label>
                     </div>';
-                } else {
-                    $editForm .= '
+            } else {
+                $editForm .= '
                     <div class="form-group">
                         <label>' . $label . '</label>
                         <input type="text" name="data[' . $column['name'] . ']" value="' . rex_escape($value) . '" class="form-control">
                     </div>';
-                }
             }
+        }
 
-            $editForm .= '
+        $editForm .= '
                 <div class="btn-toolbar">
                     <button type="submit" class="btn btn-save">' . ($addMode ? 'Erstellen' : 'Speichern') . '</button>
                     <a href="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" class="btn btn-default">Abbrechen</a>
                 </div>
             </form>';
 
-            $fragment = new rex_fragment();
-            $fragment->setVar('title', $addMode ? 'Neuer Datensatz' : 'Datensatz bearbeiten');
-            $fragment->setVar('body', $editForm, false);
-            $content .= $fragment->parse('core/page/section.php');
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', $addMode ? 'Neuer Datensatz' : 'Datensatz bearbeiten');
+        $fragment->setVar('body', $editForm, false);
+        $content = $fragment->parse('core/page/section.php'); // Hier wird $content überschrieben!
+    }
+} else {
+
+     // If table is selected and NOT in edit or add mode, show actions and list
+    if ($selectedTable) {
+        $columns = rex_sql::showColumns($selectedTable);
+        $columnNames = array_column($columns, 'name');
+
+        // Accordion for actions
+        $actionContent = '
+        <div class="panel-group" id="accordion" role="tablist">
+            <div class="panel panel-default">
+                <div class="panel-heading" role="tab" id="headingOne">
+                    <h4 class="panel-title">
+                        <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseSearch">
+                            <i class="rex-icon fa-search"></i> Suchen
+                        </a>
+                    </h4>
+                </div>
+                <div id="collapseSearch" class="panel-collapse collapse">
+                    <div class="panel-body">
+                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                            <input type="hidden" name="action" value="search">
+                            <div class="row">
+                                <div class="col-sm-4">
+                                    <select name="search_column" class="form-control" required>
+                                        <option value="">Spalte wählen...</option>';
+        foreach ($columnNames as $column) {
+            $actionContent .= '<option value="' . $column . '">' . $column . '</option>';
         }
-    } else {
+        $actionContent .= '
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <select name="search_type" class="form-control">
+                                        <option value="contains">Enthält</option>
+                                        <option value="exact">Exakt</option>
+                                        <option value="starts">Beginnt mit</option>
+                                        <option value="ends">Endet mit</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="input-group">
+                                        <input type="text" name="search_term" class="form-control" required>
+                                        <span class="input-group-btn">
+                                            <button type="submit" class="btn btn-primary"><i class="rex-icon fa-search"></i></button>
+                                            <button type="submit" name="action" value="delete_results" class="btn btn-danger"
+                                                onclick="return confirm(\'Gefundene Datensätze wirklich löschen?\')">
+                                                <i class="rex-icon fa-trash"></i>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            ' /* . $csrfToken->getHiddenField() */ . '
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel panel-default">
+                <div class="panel-heading" role="tab" id="headingTwo">
+                    <h4 class="panel-title">
+                        <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseReplace">
+                            <i class="rex-icon fa-exchange"></i> Ersetzen
+                        </a>
+                    </h4>
+                </div>
+                <div id="collapseReplace" class="panel-collapse collapse">
+                    <div class="panel-body">
+                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                            <input type="hidden" name="action" value="replace">
+                            <div class="row">
+                                <div class="col-sm-4">
+                                    <select name="replace_column" class="form-control" required>
+                                        <option value="">Spalte wählen...</option>';
+        foreach ($columnNames as $column) {
+            $actionContent .= '<option value="' . $column . '">' . $column . '</option>';
+        }
+        $actionContent .= '
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <input type="text" name="search_term" class="form-control" placeholder="Suchen nach..." required>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="input-group">
+                                        <input type="text" name="replace_term" class="form-control" placeholder="Ersetzen durch..." required>
+                                        <span class="input-group-btn">
+                                            <button type="submit" class="btn btn-primary" onclick="return confirm(\'Ersetzen wirklich durchführen?\')">
+                                                <i class="rex-icon fa-exchange"></i>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            ' /* . $csrfToken->getHiddenField() */ . '
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel panel-default">
+                <div class="panel-heading" role="tab" id="headingThree">
+                    <h4 class="panel-title">
+                        <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseTruncate">
+                            <i class="rex-icon fa-trash"></i> Tabelle leeren
+                        </a>
+                    </h4>
+                </div>
+                <div id="collapseTruncate" class="panel-collapse collapse">
+                    <div class="panel-body">
+                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                            <input type="hidden" name="action" value="truncate">
+                            <p class="alert alert-warning">
+                                Diese Aktion löscht <strong>alle</strong> Datensätze aus der Tabelle. Dies kann nicht rückgängig gemacht werden!
+                            </p>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm(\'Tabelle wirklich leeren?\')">
+                                <i class="rex-icon fa-trash"></i> Tabelle leeren (TRUNCATE)
+                            </button>
+                            ' /* . $csrfToken->getHiddenField() */ . '
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>';
+
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', 'Aktionen');
+        $fragment->setVar('body', $actionContent, false);
+        $content .= $fragment->parse('core/page/section.php');
+        // Records list
+        $listQuery = rex_sql::factory();
+        $listQuery->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
+        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
+
+        // Add actions column
+        $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
+        $list->setColumnPosition('_actions', 0);
+        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
+            $editUrl = rex_url::currentBackendPage([
+                'table' => $selectedTable,
+                'edit_id' => $params['list']->getValue('id')
+            ]);
+
+            $copyUrl = rex_url::currentBackendPage([
+                'table' => $selectedTable,
+                'func' => 'add',
+                'id' => $params['list']->getValue('id')
+            ]);
+
+            $deleteUrl = rex_url::currentBackendPage([
+                'table' => $selectedTable,
+                'record_action' => 'delete',
+                'record_id' => $params['list']->getValue('id')
+            ]) /*. '&' . $csrfToken->getUrlParams()*/;
+
+            return '
+            <div class="btn-group">
+                <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
+                    <i class="rex-icon fa-edit"></i>
+                </a>
+                <a href="' . $copyUrl . '" class="btn btn-default btn-xs" title="Kopieren">
+                    <i class="rex-icon fa-copy"></i>
+                </a>
+                <a href="' . $deleteUrl . '" class="btn btn-delete btn-xs" onclick="return confirm(\'Wirklich löschen?\')" title="Löschen">
+                    <i class="rex-icon fa-trash"></i>
+                </a>
+            </div>';
+        });
+
+        // Format columns based on data type
+        foreach ($columns as $column) {
+            $name = $column['name'];
+            if ($name === 'id') continue;
+
+            // Truncate text fields if too long
+            if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
+                $list->setColumnFormat($name, 'custom', function ($params) {
+                    $value = $params['value'];
+                    if ($value && strlen($value) > 100) {
+                        $value = substr($value, 0, 100) . '...';
+                    }
+                    return rex_escape($value);
+                });
+            }
+
+            // Format dates
+            if (strpos($column['type'], 'datetime') !== false) {
+                $list->setColumnFormat($name, 'custom', function ($params) {
+                    $value = $params['value'];
+                    if ($value && $value != '0000-00-00 00:00:00') {
+                        return rex_formatter::strftime(strtotime($value), 'datetime');
+                    }
+                    return '';
+                });
+            }
+
+            // Format boolean values
+            if (strpos($column['type'], 'tinyint(1)') !== false) {
+                $list->setColumnFormat($name, 'custom', function ($params) {
+                    return $params['value'] ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
+                });
+            }
+        }
+
+        // Wrap table in custom wrapper div
+        $list->addTableAttribute('class', 'table-striped');
+        $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
+
+        $fragment = new rex_fragment();
+        $fragment->setVar('title', 'Datensätze');
+        $fragment->setVar('content', $tableContent, false);
+        $content .= $fragment->parse('core/page/section.php');
+
         // Add "New Record" button if not editing
         $content .= '
         <div class="panel panel-default">
@@ -552,7 +549,10 @@ if ($selectedTable) {
                 </a>
             </div>
         </div>';
+
     }
+}
+
 
     // Add custom CSS for mobile optimization and fixed action column
     $content .= '
@@ -598,6 +598,5 @@ if ($selectedTable) {
             }
         }
     </style>';
-}
 
 echo $content;
