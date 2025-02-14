@@ -246,6 +246,7 @@ if ($selectedTable) {
             $fragment->setVar('body', $editForm, false);
             $content .= $fragment->parse('core/page/section.php');
         }
+    } else {
     }
 
     // Add custom CSS for mobile optimization and fixed action column
