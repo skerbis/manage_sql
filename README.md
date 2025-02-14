@@ -1,4 +1,4 @@
-# Table Builder für REDAXO 5
+# Manage SQL für REDAXO 5
 
 Table Builder ist ein REDAXO-AddOn zur vereinfachten Arbeit mit Datenbanktabellen, rex_sql und YOrm. Es unterstützt bei der korrekten Erstellung von Datenbankabfragen und der Generierung von YOrm-Modellen.
 
