@@ -57,9 +57,15 @@ if ($selectedTable && $action && rex_csrf_token::factory('table_action')->isVali
     }
 }
 
-// Build table selection form
-$formContent = '
+// Add CSS
+$content .= '
 <style>
+.rex-table-overflow {
+    margin: 0 -15px;
+}
+.rex-table-overflow .table {
+    margin: 0;
+}
 .rex-table td {
     max-width: 250px;
     overflow: hidden;
@@ -70,7 +76,16 @@ $formContent = '
     white-space: normal;
     word-break: break-word;
 }
-</style>
+.btn-group-full-width {
+    display: flex;
+}
+.btn-group-full-width .btn {
+    flex: 1;
+}
+</style>';
+
+// Build table selection form
+$formContent = '
 <form id="table-select" method="get">
     <input type="hidden" name="page" value="table_builder/data">
     <div class="row">
@@ -200,16 +215,22 @@ if ($selectedTable) {
         // Build query
         $sql = rex_sql::factory();
         $query = 'SELECT * FROM ' . $sql->escapeIdentifier($selectedTable);
-        $params = [];
 
         if ($searchValue && $searchField) {
-            $query .= ' WHERE ' . $sql->escapeIdentifier($searchField) . ' LIKE :search';
-            $params['search'] = '%' . $searchValue . '%';
+            $where = $sql->escapeIdentifier($searchField) . ' LIKE :search';
+            $query .= ' WHERE ' . $where;
         }
 
         $query .= ' ORDER BY id DESC';
 
-        $list = rex_list::factory($query, 50, $selectedTable, false, $params);
+        $list = new rex_list($query);
+        $list->setRowsPerPage(50);
+        
+        if ($searchValue && $searchField) {
+            $list->addParam('search', $searchValue);
+            $list->addParam('field', $searchField);
+            $list->addWhereCondition($where, ['search' => '%' . $searchValue . '%']);
+        }
 
         // Spalten konfigurieren
         $columns = rex_sql::showColumns($selectedTable);
@@ -232,8 +253,10 @@ if ($selectedTable) {
         $list->addColumn('Aktionen', '<i class="rex-icon fa-edit"></i> Bearbeiten', -1, ['<th class="rex-table-action">###VALUE###</th>', '<td class="rex-table-action">###VALUE###</td>']);
         $list->setColumnParams('Aktionen', ['page' => 'yform/manager/data_edit', 'func' => 'edit', 'table_name' => $selectedTable, 'data_id' => '###id###']);
 
-        // Show table content
+        // Wrap table in overflow container
+        $content .= '<div class="rex-table-overflow">';
         $content .= $list->get();
+        $content .= '</div>';
 
     } catch (Exception $e) {
         $content .= rex_view::error($e->getMessage());
