@@ -350,7 +350,7 @@ if ($selectedTable) {
                 $sql->insert();
                 $message = 'Datensatz erfolgreich erstellt.';
             } catch (Exception $e) {
-                $error = 'Fehler beim Erstellen des Datensatzes: 'e->getMessage();
+                $error = 'Fehler beim Erstellen des Datensatzes: ' . $e->getMessage();
             }
         }
         // Redirect, um das Formular zu leeren und die Änderungen anzuzeigen
