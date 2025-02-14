@@ -3,6 +3,10 @@ $content = '';
 $message = '';
 $error = '';
 
+// Get selected table and handle actions
+$selectedTable = rex_get('table', 'string');
+$action = rex_post('action', 'string');
+
 // Get all tables
 $sql = rex_sql::factory();
 $tables = $sql->getTablesAndViews();
