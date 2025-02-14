@@ -1,75 +1,108 @@
 # Table Builder für REDAXO 5
 
-Das Table Builder Addon ermöglicht die einfache Erstellung und Verwaltung von Datenbanktabellen direkt im REDAXO-Backend.
+Table Builder ist ein REDAXO-AddOn zur vereinfachten Arbeit mit Datenbanktabellen, rex_sql und YOrm. Es unterstützt bei der korrekten Erstellung von Datenbankabfragen und der Generierung von YOrm-Modellen.
 
 ## Features
 
-- Visuelle Erstellung von Datenbanktabellen
-- Automatische Erstellung von id-Spalten (auto increment)
-- Unterstützung der gängigsten MySQL-Spaltentypen
-- Automatische Generierung von rex_sql_table Code
-- SQL Schema Export
+### Datenbank-Management
+- Visuelle Erstellung und Bearbeitung von Datenbanktabellen
+- Automatische Erstellung von korrekten Tabellenstrukturen inkl. Primärschlüssel
+- Verwaltung von Spaltentypen, Indizes und Fremdschlüsseln
+
+### Query Builder
+- Visuelle Erstellung von rex_sql Queries
+- Automatische Generierung von sicherem Code
+- Unterstützung für komplexe WHERE-Bedingungen
+- Live-Vorschau der generierten Abfragen
+- Testmöglichkeit direkt im Backend
+
+### YOrm Generator
+- Automatische Generierung von YOrm-Model-Klassen
+- Erstellung von Type-Hints für bessere IDE-Unterstützung
+- Generierung von Getter-Methoden
+- Beispielcode für CRUD-Operationen
+- Relation-Handling
 
 ## Installation
 
-1. Das Addon-Verzeichnis `table_builder` in `/redaxo/src/addons/` erstellen
-2. Die Addon-Dateien in das Verzeichnis kopieren
-3. Das Addon im REDAXO-Backend unter "Installer" installieren und aktivieren
+1. Im REDAXO-Installer das AddOn "table_builder" herunterladen
+2. Installation und Aktivierung durchführen
+3. Rechte für Administratoren setzen
 
 ## Systemvoraussetzungen
 
 * PHP 8.1 oder höher
 * REDAXO 5.18.1 oder höher
+* YForm 4.0.0 oder höher
 
-## Verwendung
+## Anwendungsbereiche
 
-### Neue Tabelle erstellen
+### Tabellenerstellung
+- Strukturierte Anlage neuer Datenbanktabellen
+- Verwaltung bestehender Tabellenstrukturen
+- Export von Tabellendefinitionen als rex_sql_table Code
 
-1. Im REDAXO-Backend zu "Table Builder" > "Neue Tabelle" navigieren
-2. Einen Tabellennamen eingeben (das Prefix "rex_" wird automatisch hinzugefügt)
-3. Über "Spalte hinzufügen" beliebig viele Spalten anlegen
-4. Für jede Spalte:
-   - Namen festlegen
-   - Typ auswählen
-   - Optional: Standardwert definieren
-   - Optional: "Nullable" aktivieren/deaktivieren
-5. "Tabelle erstellen" klicken
-6. Nach erfolgreicher Erstellung wird der generierte rex_sql_table Code angezeigt
+### Query-Erstellung
+- Generierung sicherer Datenbankabfragen
+- Unterstützung verschiedener Query-Typen (SELECT, INSERT, UPDATE, DELETE)
+- Automatische Parameterbindung
+- Beispiele für komplexe Abfragen
 
-### Tabellenübersicht
+### YOrm-Integration
+- Model-Generierung für YForm-Tabellen
+- Erzeugen typsicherer Datenzugriffsmethoden
+- Beispiele für Relation-Handling
+- Generierung von Formular- und Listen-Code
 
-Unter "Table Builder" > "Tabellen" werden alle vorhandenen Tabellen mit Prefix "rex_" angezeigt.
+## Code-Beispiele
 
-### SQL Export
+### Tabellendefinition
+```php
+// Generierter Code für eine neue Tabelle
+rex_sql_table::get(rex::getTable('example'))
+    ->ensurePrimaryIdColumn()
+    ->ensureColumn(new rex_sql_column('title', 'varchar(255)'))
+    ->ensureColumn(new rex_sql_column('description', 'text'))
+    ->ensure();
+```
 
-Unter "Table Builder" > "SQL Export" kann das Schema bestehender Tabellen als rex_sql_table Code exportiert werden.
+### Query-Beispiel
+```php
+// Generierte sichere Abfrage
+$sql = rex_sql::factory();
+$sql->setQuery('SELECT * FROM rex_example WHERE status = :status', ['status' => 1]);
+```
 
-## Verfügbare Spaltentypen
+### YOrm-Model
+```php
+// Generiertes YOrm-Model
+class Example extends rex_yform_manager_dataset
+{
+    public function getTitle(): string 
+    {
+        return $this->getValue('title');
+    }
+    
+    public static function getAll(): rex_yform_manager_collection
+    {
+        return self::query()->find();
+    }
+}
+```
 
-- VARCHAR(255) - Für Texte bis 255 Zeichen
-- TEXT - Für längere Texte
-- INT(10) - Für Ganzzahlen
-- INT(10) UNSIGNED - Für positive Ganzzahlen
-- DECIMAL(10,2) - Für Dezimalzahlen
-- DATETIME - Für Datum mit Uhrzeit
-- DATE - Für Datum
-- TIME - Für Uhrzeit
-- TINYINT(1) - Für Boolean-Werte
-- MEDIUMTEXT - Für mittellange Texte
-- LONGTEXT - Für sehr lange Texte
+## Unterstützung & Bugs
 
-## Support & Bugs
-
-Bitte Bugs und Feature-Requests im GitHub Repository melden:
-https://github.com/your/repo
+Fehler bitte im GitHub-Repository melden:
+https://github.com/alexplusde/table_builder
 
 ## Lizenz
 
-MIT License
+MIT Lizenz, siehe [LICENSE.md](LICENSE.md)
 
 ## Autor
 
-YOUR NAME
+**Alexander Walther**  
+https://github.com/alexplusde
 
 ## Credits
 
