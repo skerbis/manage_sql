@@ -10,9 +10,9 @@ requires:
         yform: '>=4.0.0'
 
 page:
-    title: 'Table Builder'
+    title: 'manage_sql'
     perm: admin
-    icon: rex-icon fa-table
+    icon: rex-icon fa-server
     subpages:
         tables: 
             title: 'Tabellen'
