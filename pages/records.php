@@ -166,9 +166,10 @@ if ($selectedTable) {
     // Add responsive table wrapper and classes
     $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
     
-    // Move actions to the beginning
-    $list->addColumn('actions', '', 0, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
-    $list->setColumnFormat('actions', 'custom', function ($params) use ($selectedTable) {
+    // Add actions column first
+    $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
+    $list->setColumnPosition('_actions', 0);
+    $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable) {
         $token = rex_csrf_token::factory('table_records');
         $editUrl = rex_url::backendPage('table_builder/records', [
             'table' => $selectedTable,
@@ -197,7 +198,7 @@ if ($selectedTable) {
     
     $fragment = new rex_fragment();
     $fragment->setVar('title', 'Datensätze');
-    $fragment->setVar('content', $list->get(), false);
+    $fragment->setVar('content', $tableContent, false);
     $content .= $fragment->parse('core/page/section.php');
 
     // Show edit form if requested
