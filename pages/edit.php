@@ -49,7 +49,7 @@ if (rex_post('updatetable', 'boolean')) {
                 $column['comment'] ?? null
             ));
             
-            // Set position
+            // Set position if specified
             if (isset($column['after'])) {
                 $after = $column['after'];
                 if ($after === 'FIRST') {
@@ -57,6 +57,7 @@ if (rex_post('updatetable', 'boolean')) {
                 } else {
                     $table->setPosition($columnName, $after);
                 }
+            }
         }
         
         // Add new column if data exists
@@ -158,7 +159,7 @@ $formContent .= '</select>
                 </div>
                 <div class="col-sm-3">
                     <div class="form-group">
-                        <label>Position nach:</label>
+                        <label>Position:</label>
                         <select name="columns['.$name.'][after]" class="form-control">
                             <option value="FIRST">Am Anfang</option>';
                             
