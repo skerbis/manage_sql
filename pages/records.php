@@ -7,7 +7,7 @@ $message = '';
 $error = '';
 
 // Debug-Modus
-$debug = true; // Set to true for detailed debugging
+$debug = true; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
@@ -39,21 +39,21 @@ $sql->setDebug($debug);
 function buildWhereClause(string $column, string $term, string $type, rex_sql $sqlInstance): array
 {
     $where = '';
-    $searchTerm = $sqlInstance->escape($term); // Escape before adding wildcards!
+    $column = '`' . rex_escape($column) . '`'; // Escape and quote the column name
 
     if ($column && $term) {
         switch ($type) {
             case 'exact':
-                $where = '`' . rex_escape($column) . '` = "' . $searchTerm . '"';
+                $where = $column . ' = ' . $sqlInstance->escape($term);
                 break;
             case 'starts':
-                $where = '`' . rex_escape($column) . '` LIKE "' . $searchTerm . '%"';
+                $where = $column . ' LIKE ' . $sqlInstance->escape($term . '%'); // Escape with wildcard
                 break;
             case 'ends':
-                $where = '`' . rex_escape($column) . '` LIKE "%' . $searchTerm . '"';
+                $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term); // Escape with wildcard
                 break;
             default: // contains
-                $where = '`' . rex_escape($column) . '` LIKE "%' . $searchTerm . '%"';
+                $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term . '%'); // Escape with wildcard
         }
     }
 
@@ -441,14 +441,13 @@ if ($editId || $addMode) {
             $params = $whereData['params'];
         }
 
-
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
 
-         echo '<pre>Final Query: ' . $query . '</pre>'; // Debug Query
+        echo '<pre>Final Query: ' . $query . '</pre>'; // Debug Query
+
         try {
             $list = rex_list::factory($query);
-            dump($list); // Debug list object
-
+            // dump($list); // Debug list object, remove in production!
 
             // Add actions column
             $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
