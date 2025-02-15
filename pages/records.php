@@ -486,20 +486,18 @@ if ($editId || $addMode) {
         $content .= $fragment->parse('core/page/section.php');
 
         // Records list
-        $list = rex_list::factory($selectedTable, 30);
+        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
         $list->setNoDataMessage('Keine Datensätze gefunden.');
 
         // Überprüfen, ob Suchergebnisse vorliegen und diese verwenden
         if (!empty($searchResults)) {
             $list->setDataset($searchResults);
-        } else {
-             $list->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
         }
 
         // Add actions column
         $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
         $list->setColumnPosition('_actions', 0);
-        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
+        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken, $searchTerm, $searchColumn, $searchType) {
             $editUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
                 'edit_id' => $params['list']->getValue('id'),
@@ -521,10 +519,10 @@ if ($editId || $addMode) {
                 'table' => $selectedTable,
                 'record_action' => 'delete',
                 'record_id' => $params['list']->getValue('id'),
-                 'search_term' => $searchTerm,
-                 'search_column' => $searchColumn,
-                 'search_type' => $searchType
-            ]) /*. '&' . $csrfToken->getUrlParams()*/;
+                'search_term' => $searchTerm,
+                'search_column' => $searchColumn,
+                'search_type' => $searchType
+            ]);
 
             return '
             <div class="btn-group">
