@@ -458,27 +458,41 @@ $actionContent .= '
 
         // Apply search filter if exists
         if ($searchData = rex_session('table_records_search', 'array')) {
-            $value = $searchData['term'];
-            $column = $searchData['column'];
-            
-            // Escape value for direct inclusion in query
             $sql = rex_sql::factory();
-            $value = $sql->escape($value);
+            $sql->setDebug($debug);
+            
+            $column = '`' . $searchData['column'] . '`'; // Backticks für Spaltennamen
             
             switch ($searchData['type']) {
                 case 'exact':
-                    $whereCondition = ' WHERE ' . $column . ' = ' . $value;
+                    $whereCondition = ' WHERE ' . $column . ' = ' . $sql->escape($searchData['term']);
                     break;
                 case 'starts':
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape($value . '%');
+                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape($searchData['term'] . '%');
                     break;
                 case 'ends':
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $value);
+                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $searchData['term']);
                     break;
                 default: // contains
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $value . '%');
+                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $searchData['term'] . '%');
+            }
+            
+            if ($debug) {
+                echo '<pre>Search Data: ';
+                print_r($searchData);
+                echo '<br>Where Condition: ' . $whereCondition;
+                echo '</pre>';
             }
         }
+
+        $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
+        
+        if ($debug) {
+            echo '<pre>Final Query: ' . $query . '</pre>';
+        }
+        
+        try {
+            $list = rex_list::factory($query);
 
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
         $list = rex_list::factory($query);
