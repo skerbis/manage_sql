@@ -19,10 +19,8 @@ if (!$table->exists()) {
 if (rex_post('updatetable', 'boolean')) {
     $columns = rex_post('columns', 'array');
     
-    $sql = rex_sql::factory();
-    
     try {
-        $sql->transactional(function() use ($columns, $table, &$tableName) {
+        foreach ($columns as $columnName => $column) {
             foreach ($columns as $columnName => $column) {
                 if (isset($column['delete']) && $column['delete']) {
                     // Delete column
@@ -69,12 +67,11 @@ if (rex_post('updatetable', 'boolean')) {
             
             // Save changes
             $table->ensure();
-        });
-        
-        $message = 'Tabelle wurde erfolgreich aktualisiert.';
-        
-        // Regenerate table object to get fresh data
-        $table = rex_sql_table::get($tableName);
+            
+            $message = 'Tabelle wurde erfolgreich aktualisiert.';
+            
+            // Regenerate table object to get fresh data
+            $table = rex_sql_table::get($tableName);
         
     } catch (Exception $e) {
         $error = $e->getMessage();
