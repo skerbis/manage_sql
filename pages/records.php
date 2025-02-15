@@ -40,22 +40,24 @@ $sql->setDebug($debug);
 function buildWhereClause(string $column, string $term, string $type, rex_sql $sqlInstance): array
 {
     $where = '';
+    if (!$column || !$term) {
+        return ['where' => '', 'params' => []];  // Return empty WHERE clause if column or term is missing
+    }
+
     $column = '`' . rex_escape($column) . '`'; // Escape and quote the column name
 
-    if ($column && $term) {
-        switch ($type) {
-            case 'exact':
-                $where = $column . ' = ' . $sqlInstance->escape($term);
-                break;
-            case 'starts':
-                $where = $column . ' LIKE ' . $sqlInstance->escape($term . '%'); // Escape with wildcard
-                break;
-            case 'ends':
-                $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term); // Escape with wildcard
-                break;
-            default: // contains
-                $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term . '%'); // Escape with wildcard
-        }
+    switch ($type) {
+        case 'exact':
+            $where = $column . ' = ' . $sqlInstance->escape($term);
+            break;
+        case 'starts':
+            $where = $column . ' LIKE ' . $sqlInstance->escape($term . '%'); // Escape with wildcard
+            break;
+        case 'ends':
+            $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term); // Escape with wildcard
+            break;
+        default: // contains
+            $where = $column . ' LIKE ' . $sqlInstance->escape('%' . $term . '%'); // Escape with wildcard
     }
 
     return ['where' => $where, 'params' => []]; // No parameters needed anymore
