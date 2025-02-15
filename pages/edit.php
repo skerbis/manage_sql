@@ -20,10 +20,12 @@ if (rex_post('updatetable', 'boolean')) {
     $columns = rex_post('columns', 'array');
     
     $sql = rex_sql::factory();
+    $transactionStarted = false;
     
     try {
         // Start transaction
         $sql->beginTransaction();
+        $transactionStarted = true;
         
         foreach ($columns as $columnName => $column) {
             if (isset($column['delete']) && $column['delete']) {
@@ -71,7 +73,11 @@ if (rex_post('updatetable', 'boolean')) {
         
         // Save changes
         $table->ensure();
-        $sql->commit();
+        
+        if ($transactionStarted) {
+            $sql->commit();
+            $transactionStarted = false;
+        }
         
         $message = 'Tabelle wurde erfolgreich aktualisiert.';
         
@@ -79,8 +85,9 @@ if (rex_post('updatetable', 'boolean')) {
         $table = rex_sql_table::get($tableName);
         
     } catch (Exception $e) {
-        if ($sql->inTransaction()) {
+        if ($transactionStarted) {
             $sql->rollBack();
+            $transactionStarted = false;
         }
         $error = $e->getMessage();
     }
