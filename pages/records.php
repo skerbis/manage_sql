@@ -33,54 +33,35 @@ $sql->setDebug($debug);
  * @param string $column The column to search in.
  * @param string $term The search term.
  * @param string $type The search type (exact, starts, ends, contains).
+ * @param rex_sql $sqlInstance The rex_sql instance for escaping.
  *
  * @return array An associative array containing the WHERE clause and parameters.
  */
-function buildWhereClause(string $column, string $term, string $type): array
+function buildWhereClause(string $column, string $term, string $type, rex_sql $sqlInstance): array
 {
     $where = '';
-    $params = [];
+    $searchTerm = $sqlInstance->escape($term); // Escape before adding wildcards!
 
     if ($column && $term) {
         switch ($type) {
             case 'exact':
-                $where = '`' . rex_escape($column) . '` = :term';
-                $params['term'] = $term;
+                $where = '`' . rex_escape($column) . '` = "' . $searchTerm . '"';
                 break;
             case 'starts':
-                $where = '`' . rex_escape($column) . '` LIKE :term';
-                $params['term'] = $term . '%';
+                $where = '`' . rex_escape($column) . '` LIKE "' . $searchTerm . '%"';
                 break;
             case 'ends':
-                $where = '`' . rex_escape($column) . '` LIKE :term';
-                $params['term'] = '%' . $term;
+                $where = '`' . rex_escape($column) . '` LIKE "%' . $searchTerm . '"';
                 break;
             default: // contains
-                $where = '`' . rex_escape($column) . '` LIKE :term';
-                $params['term'] = '%' . $term . '%';
+                $where = '`' . rex_escape($column) . '` LIKE "%' . $searchTerm . '%"';
         }
     }
 
-    return ['where' => $where, 'params' => $params];
+    return ['where' => $where, 'params' => []]; // No parameters needed anymore
 }
 
 
-/**
- * Generates a single record action button.
- *
- * @param string $url The URL for the action.
- * @param string $iconClass The Font Awesome icon class.
- * @param string $title The title of the button.
- * @param bool $confirmation Whether to show a confirmation dialog.
- * @param string $cssClass Additional CSS classes for the button.
- *
- * @return string The HTML for the action button.
- */
-function getActionButton(string $url, string $iconClass, string $title, bool $confirmation = false, string $cssClass = ''): string
-{
-    $onclick = $confirmation ? 'return confirm(\'' . $confirmation . '\')' : '';
-    return '<a href="' . $url . '" class="btn ' . $cssClass . ' btn-xs" title="' . $title . '" onclick="' . $onclick . '"><i class="rex-icon ' . $iconClass . '"></i></a>';
-}
 
 // --- ACTION HANDLER ---
 
@@ -103,12 +84,12 @@ if ($action && !$csrfToken->isValid()) {
                 rex_set_session('table_records_search', $searchData);
 
                 // Build WHERE clause based on search type
-                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType);
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql);  // Pass $sql
                 $where = $whereData['where'];
                 $params = $whereData['params'];
 
                 if ($where) {
-                    $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+                    $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where); // No parameters
                     $count = $sql->getValue('count');
                     $message = $count . ' Datensätze gefunden.';
                 }
@@ -121,7 +102,7 @@ if ($action && !$csrfToken->isValid()) {
 
                 if ($replaceColumn && $searchTerm) {
                     $sql->setQuery(
-                        'UPDATE ' . $selectedTable . ' 
+                        'UPDATE ' . $selectedTable . '
                          SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
                         ['search' => $searchTerm, 'replace' => $replaceTerm]
                     );
@@ -135,18 +116,18 @@ if ($action && !$csrfToken->isValid()) {
                 $searchType = rex_post('search_type', 'string');
 
                 // Build WHERE clause based on search type
-                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType);
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql);  // Pass $sql
                 $where = $whereData['where'];
                 $params = $whereData['params'];
 
                 if ($where) {
                     try {
                         // First count matching records
-                        $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+                        $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where);  // No parameters
                         $count = $sql->getValue('count');
 
                         // Then delete
-                        $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
+                        $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where); // No parameters
                         $message = $count . ' Datensätze gelöscht.';
                     } catch (rex_sql_exception $e) {
                         $error = $e->getMessage();
@@ -327,7 +308,7 @@ if ($editId || $addMode) {
 
             $actionContent .= '
                 <div class="alert alert-info">
-                    Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong> 
+                    Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong>
                     ' . rex_escape($searchData['term']) . '
                     <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right">
                         <i class="rex-icon fa-times"></i> Filter zurücksetzen
@@ -455,7 +436,7 @@ if ($editId || $addMode) {
 
         // Apply search filter if exists
         if ($searchData) {
-            $whereData = buildWhereClause($searchData['column'], $searchData['term'], $searchData['type']);
+            $whereData = buildWhereClause($searchData['column'], $searchData['term'], $searchData['type'], $sql);  // Pass $sql
             $whereCondition = ' WHERE ' . $whereData['where'];
             $params = $whereData['params'];
         }
