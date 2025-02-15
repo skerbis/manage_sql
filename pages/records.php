@@ -7,7 +7,7 @@ $message = '';
 $error = '';
 
 // Debug-Modus
-$debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
+$debug = true; // Set to true for detailed debugging
 
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
@@ -24,7 +24,6 @@ $csrfToken = rex_csrf_token::factory('table_records');
 // SQL instance
 $sql = rex_sql::factory();
 $sql->setDebug($debug);
-
 
 // --- Functions ---
 /**
@@ -60,8 +59,6 @@ function buildWhereClause(string $column, string $term, string $type, rex_sql $s
 
     return ['where' => $where, 'params' => []]; // No parameters needed anymore
 }
-
-
 
 // --- ACTION HANDLER ---
 
@@ -217,6 +214,9 @@ $fragment->setVar('title', 'Tabelle auswählen');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
+if ($selectedTable) {
+    echo '<pre>selectedTable: ' . $selectedTable . '</pre>'; // Debug Table Name
+}
 
 // Show edit/add form if requested
 if ($editId || $addMode) {
@@ -444,8 +444,11 @@ if ($editId || $addMode) {
 
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
 
+         echo '<pre>Final Query: ' . $query . '</pre>'; // Debug Query
         try {
             $list = rex_list::factory($query);
+            dump($list); // Debug list object
+
 
             // Add actions column
             $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
@@ -464,7 +467,6 @@ if ($editId || $addMode) {
 
                 return '<div class="btn-group">' . $editButton . $copyButton . $deleteButton . '</div>';
             });
-
 
             // Format columns based on data type
             foreach ($columns as $column) {
