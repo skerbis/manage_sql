@@ -483,7 +483,7 @@ $actionContent .= '
                 echo '<br>Where Condition: ' . $whereCondition;
                 echo '</pre>';
             }
-        }
+        
 
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
         
