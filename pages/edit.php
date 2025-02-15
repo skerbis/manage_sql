@@ -39,7 +39,12 @@ if (rex_post('updatetable', 'boolean')) {
                 $columnName = $newName;
             }
             
-            // Update column
+            // Update column and position
+            $after = null;
+            if (isset($column['after'])) {
+                $after = $column['after'] === 'FIRST' ? rex_sql_table::FIRST : $column['after'];
+            }
+            
             $table->ensureColumn(new rex_sql_column(
                 $columnName,
                 $column['type'],
@@ -47,17 +52,7 @@ if (rex_post('updatetable', 'boolean')) {
                 $column['default'] ?? null,
                 $column['extra'] ?? null,
                 $column['comment'] ?? null
-            ));
-            
-            // Set position if specified
-            if (isset($column['after'])) {
-                $after = $column['after'];
-                if ($after === 'FIRST') {
-                    $table->setPosition($columnName, rex_sql_table::FIRST);
-                } else {
-                    $table->setPosition($columnName, $after);
-                }
-            }
+            ), $after);
         }
         
         // Add new column if data exists
