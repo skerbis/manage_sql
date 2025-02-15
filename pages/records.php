@@ -7,7 +7,7 @@ $message = '';
 $error = '';
 
 // Debug-Modus
-$debug = true; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
+$debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
@@ -244,7 +244,7 @@ if ($searchData) {
     $content .= '
         <div class="alert alert-info">
             Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong> ' . rex_escape($searchData['term']) . '
-            <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right">
+            <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right ms-records-text-dark">
                 <i class="rex-icon fa-times"></i> Filter zurücksetzen
             </a>
         </div>';
@@ -549,43 +549,46 @@ if ($editId || $addMode) {
 // Add custom CSS for mobile optimization and fixed action column
 $content .= '
 <style>
-    .table-wrapper {
+    .ms-records-text-dark {
+        color: #000 !important; /* Or any dark color */
+    }
+    .ms-records-table-wrapper {
         position: relative;
         margin-bottom: 0;
         border: 0;
     }
-    .table-wrapper table {
+    .ms-records-table-wrapper table {
         margin-bottom: 0;
     }
-    .table-wrapper th:first-child,
-    .table-wrapper td:first-child {
+    .ms-records-table-wrapper th:first-child,
+    .ms-records-table-wrapper td:first-child {
         position: sticky;
         left: 0;
         background: #fff;
         z-index: 1;
         border-right: 2px solid #eee;
     }
-    .checkbox {
+    .ms-records-checkbox {
         margin-top: 7px;
     }
     @media screen and (max-width: 768px) {
-        .table-responsive > .table > tbody > tr > td {
+        .ms-records-table-responsive > .ms-records-table > tbody > tr > td {
             white-space: normal;
         }
-        .table td[data-title]:before {
+        .ms-records-table td[data-title]:before {
             content: attr(data-title);
             display: block;
             font-weight: bold;
             margin-bottom: 5px;
         }
-        .btn-group {
+        .ms-records-btn-group {
             display: flex;
             justify-content: flex-start;
         }
-        .panel-title {
+        .ms-records-panel-title {
             font-size: 14px;
         }
-        .input-group {
+        .ms-records-input-group {
             margin-top: 10px;
         }
     }
