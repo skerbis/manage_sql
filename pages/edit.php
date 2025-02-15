@@ -48,6 +48,15 @@ if (rex_post('updatetable', 'boolean')) {
                 $column['extra'] ?? null,
                 $column['comment'] ?? null
             ));
+            
+            // Set position
+            if (isset($column['after'])) {
+                $after = $column['after'];
+                if ($after === 'FIRST') {
+                    $table->setPosition($columnName, rex_sql_table::FIRST);
+                } else {
+                    $table->setPosition($columnName, $after);
+                }
         }
         
         // Add new column if data exists
@@ -145,6 +154,22 @@ $formContent .= '</select>
                             <input type="checkbox" name="columns['.$name.'][nullable]" value="1"'.($column->isNullable() ? ' checked' : '').'>
                             Nullable
                         </label>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <label>Position nach:</label>
+                        <select name="columns['.$name.'][after]" class="form-control">
+                            <option value="FIRST">Am Anfang</option>';
+                            
+foreach ($columns as $otherColumn) {
+    $otherName = $otherColumn->getName();
+    if ($otherName !== $name && $otherName !== 'id') {
+        $formContent .= '<option value="'.$otherName.'">'.$otherName.'</option>';
+    }
+}
+
+$formContent .= '</select>
                     </div>
                 </div>
             </div>
