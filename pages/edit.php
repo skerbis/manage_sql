@@ -21,57 +21,56 @@ if (rex_post('updatetable', 'boolean')) {
     
     try {
         foreach ($columns as $columnName => $column) {
-            foreach ($columns as $columnName => $column) {
-                if (isset($column['delete']) && $column['delete']) {
-                    // Delete column
-                    $table->removeColumn($columnName);
-                    continue;
+            if (isset($column['delete']) && $column['delete']) {
+                // Delete column
+                $table->removeColumn($columnName);
+                continue;
+            }
+            
+            // Check if column should be renamed
+            $newName = $column['new_name'] ?? '';
+            if (!empty($newName) && $newName !== $columnName) {
+                // Check if new name already exists
+                if ($table->hasColumn($newName)) {
+                    throw new rex_exception(sprintf('Eine Spalte mit dem Namen "%s" existiert bereits.', $newName));
                 }
-                
-                // Check if column should be renamed
-                $newName = $column['new_name'] ?? '';
-                if (!empty($newName) && $newName !== $columnName) {
-                    // Check if new name already exists
-                    if ($table->hasColumn($newName)) {
-                        throw new rex_exception(sprintf('Eine Spalte mit dem Namen "%s" existiert bereits.', $newName));
-                    }
-                    // Rename column
-                    $table->renameColumn($columnName, $newName);
-                    $columnName = $newName;
-                }
-                
-                // Update column
+                // Rename column
+                $table->renameColumn($columnName, $newName);
+                $columnName = $newName;
+            }
+            
+            // Update column
+            $table->ensureColumn(new rex_sql_column(
+                $columnName,
+                $column['type'],
+                (bool)($column['nullable'] ?? false),
+                $column['default'] ?? null,
+                $column['extra'] ?? null,
+                $column['comment'] ?? null
+            ));
+        }
+        
+        // Add new column if data exists
+        if ($newColumn = rex_post('new_column', 'array')) {
+            if (!empty($newColumn['name']) && !empty($newColumn['type'])) {
                 $table->ensureColumn(new rex_sql_column(
-                    $columnName,
-                    $column['type'],
-                    (bool)($column['nullable'] ?? false),
-                    $column['default'] ?? null,
-                    $column['extra'] ?? null,
-                    $column['comment'] ?? null
+                    $newColumn['name'],
+                    $newColumn['type'],
+                    (bool)($newColumn['nullable'] ?? false),
+                    $newColumn['default'] ?? null,
+                    $newColumn['extra'] ?? null,
+                    $newColumn['comment'] ?? null
                 ));
             }
-            
-            // Add new column if data exists
-            if ($newColumn = rex_post('new_column', 'array')) {
-                if (!empty($newColumn['name']) && !empty($newColumn['type'])) {
-                    $table->ensureColumn(new rex_sql_column(
-                        $newColumn['name'],
-                        $newColumn['type'],
-                        (bool)($newColumn['nullable'] ?? false),
-                        $newColumn['default'] ?? null,
-                        $newColumn['extra'] ?? null,
-                        $newColumn['comment'] ?? null
-                    ));
-                }
-            }
-            
-            // Save changes
-            $table->ensure();
-            
-            $message = 'Tabelle wurde erfolgreich aktualisiert.';
-            
-            // Regenerate table object to get fresh data
-            $table = rex_sql_table::get($tableName);
+        }
+        
+        // Save changes
+        $table->ensure();
+        
+        $message = 'Tabelle wurde erfolgreich aktualisiert.';
+        
+        // Regenerate table object to get fresh data
+        $table = rex_sql_table::get($tableName);
         
     } catch (Exception $e) {
         $error = $e->getMessage();
