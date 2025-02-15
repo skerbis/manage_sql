@@ -10,28 +10,35 @@ $debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
 
-// CSRF protection - erstmal auskommentiert für Debug
+//CSRF Token auskommentiert
 // $csrfToken = rex_csrf_token::factory('table_records');
 
+// Initialize search parameters and results
+$searchTerm = rex_request('search_term', 'string', '');
+$searchColumn = rex_request('search_column', 'string', '');
+$searchType = rex_request('search_type', 'string', 'contains'); // Default auf 'contains' setzen
+$searchResults = [];
+
 // Handle actions when form is submitted
-if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
+if ($action /*&& !$csrfToken->isValid()*/) {
     // if ($action && !$csrfToken->isValid()) { //CSRF wieder aktivieren
     //     $error = rex_i18n::msg('csrf_token_invalid');
     // }
    //  elseif ($action) {
         $sql = rex_sql::factory();
-        $sql->setDebug(false);
-    
+        $sql->setDebug($debug);
+
     try {
         switch ($action) {
             case 'search':
                 $searchColumn = rex_post('search_column', 'string');
                 $searchTerm = rex_post('search_term', 'string');
                 $searchType = rex_post('search_type', 'string');
-                
+
                 // Build WHERE clause based on search type
-                $where = '';
+                $where = '1=1'; // Standardmäßig alle Datensätze auswählen
                 $params = [];
+
                 if ($searchColumn && $searchTerm) {
                     switch ($searchType) {
                         case 'exact':
@@ -50,20 +57,33 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                             $where = $searchColumn . ' LIKE :term';
                             $params['term'] = '%' . $searchTerm . '%';
                     }
-                    
+
+                   // Suchergebnisse abrufen
                     $sql->setQuery('SELECT * FROM ' . $selectedTable . ' WHERE ' . $where, $params);
-                    $message = count($sql->getArray()) . ' Datensätze gefunden.';
+                    $searchResults = $sql->getArray(); // Suchergebnisse speichern
+
+                    $message = count($searchResults) . ' Datensätze gefunden.';
+
+                    // Remember the search parameters in the URL for the list
+                     $searchTerm = rex_post('search_term', 'string');
+                     $searchColumn = rex_post('search_column', 'string');
+                     $searchType = rex_post('search_type', 'string');
+                } else {
+                    //Wenn keine Suchbegriffe angegeben wurden
+                    $searchResults = []; // Keine Ergebnisse anzeigen.
+                    $message = "Bitte Suchbegriffe eingeben.";
                 }
+
                 break;
 
             case 'replace':
                 $replaceColumn = rex_post('replace_column', 'string');
                 $searchTerm = rex_post('search_term', 'string');
                 $replaceTerm = rex_post('replace_term', 'string');
-                
+
                 if ($replaceColumn && $searchTerm) {
                     $sql->setQuery(
-                        'UPDATE ' . $selectedTable . ' 
+                        'UPDATE ' . $selectedTable . '
                          SET ' . $replaceColumn . ' = REPLACE(' . $replaceColumn . ', :search, :replace)',
                         ['search' => $searchTerm, 'replace' => $replaceTerm]
                     );
@@ -72,11 +92,11 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                 break;
 
             case 'delete_results':
-                $searchColumn = rex_post('search_column', 'string');
-                $searchTerm = rex_post('search_term', 'string');
-                $searchType = rex_post('search_type', 'string');
+                 $searchColumn = rex_post('search_column', 'string');
+                 $searchTerm = rex_post('search_term', 'string');
+                 $searchType = rex_post('search_type', 'string');
 
-                if ($debug) {
+                 if ($debug) {
                     echo '<pre>';
                     echo '<b>Debug Delete Results:</b><br>';
                     echo 'searchColumn: ';
@@ -86,8 +106,8 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                     echo 'searchType: ';
                     var_dump($searchType);
                     echo '</pre>';
-                }
-                
+                 }
+
                 if ($searchColumn && $searchTerm) {
                     $where = '';
                     $params = [];
@@ -108,7 +128,7 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                             $searchTerm = '%' . $searchTerm . '%';
                     }
 
-                    $params['term'] = $searchTerm;
+                     $params['term'] = $searchTerm;
 
                     if ($debug) {
                         echo '<pre>';
@@ -118,20 +138,22 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                         echo '$params: ';
                         var_dump($params);
                         echo '</pre>';
-                    }
-                    
+                     }
+
                     try {
                         $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
 
-                        if ($debug) {
+                         if ($debug) {
                             echo '<pre>';
                             echo '<b>Debug Delete Results - After SQL:</b><br>';
                             echo '$sql->getRows(): ';
                             var_dump($sql->getRows());
                             echo '</pre>';
-                        }
+                         }
 
-                        $message = $sql->getRows() . ' Datensätze gelöscht.';
+                         $message = $sql->getRows() . ' Datensätze gelöscht.';
+                         $searchResults = [];
+                         $searchTerm = ''; // Suchbegriff löschen nach dem Löschen.
 
                     } catch (rex_sql_exception $e) {
                         if ($debug) {
@@ -145,15 +167,17 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                 }
                 break;
 
+
             case 'truncate':
                 $sql->setQuery('TRUNCATE TABLE ' . $selectedTable);
                 $message = 'Tabelle wurde geleert.';
+                $searchResults = [];
                 break;
-                
+
             case 'save':
                 $data = rex_post('data', 'array', []);
                 $recordId = rex_post('record_id', 'int');
-                
+
                 if ($data && $recordId) {
                     $sql->setTable($selectedTable);
                     $sql->setWhere(['id' => $recordId]);
@@ -162,10 +186,10 @@ if ($action /* && !$csrfToken->isValid() - entfernt für Debug */) {
                     $message = 'Datensatz gespeichert.';
                 }
                 break;
-                
+
             case 'create':
                 $data = rex_post('data', 'array', []);
-                
+
                 if ($data) {
                     $sql->setTable($selectedTable);
                     $sql->setValues($data);
@@ -346,29 +370,33 @@ if ($editId || $addMode) {
                 </div>
                 <div id="collapseSearch" class="panel-collapse collapse">
                     <div class="panel-body">
-                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                       <form action="' . rex_url::currentBackendPage(['table' => $selectedTable,
+                                                                      'search_term' => $searchTerm,
+                                                                      'search_column' => $searchColumn,
+                                                                      'search_type' => $searchType]) . '" method="post">
                             <input type="hidden" name="action" value="search">
                             <div class="row">
                                 <div class="col-sm-4">
                                     <select name="search_column" class="form-control" required>
                                         <option value="">Spalte wählen...</option>';
         foreach ($columnNames as $column) {
-            $actionContent .= '<option value="' . $column . '">' . $column . '</option>';
+            $selected = ($searchColumn === $column) ? 'selected' : '';
+            $actionContent .= '<option value="' . $column . '" ' . $selected . '>' . $column . '</option>';
         }
         $actionContent .= '
                                     </select>
                                 </div>
                                 <div class="col-sm-4">
                                     <select name="search_type" class="form-control">
-                                        <option value="contains">Enthält</option>
-                                        <option value="exact">Exakt</option>
-                                        <option value="starts">Beginnt mit</option>
-                                        <option value="ends">Endet mit</option>
+                                        <option value="contains" '.($searchType === 'contains' ? 'selected' : '').'>Enthält</option>
+                                        <option value="exact" '.($searchType === 'exact' ? 'selected' : '').'>Exakt</option>
+                                        <option value="starts" '.($searchType === 'starts' ? 'selected' : '').'>Beginnt mit</option>
+                                        <option value="ends" '.($searchType === 'ends' ? 'selected' : '').'>Endet mit</option>
                                     </select>
                                 </div>
                                 <div class="col-sm-4">
                                     <div class="input-group">
-                                        <input type="text" name="search_term" class="form-control" required>
+                                        <input type="text" name="search_term" class="form-control" required value="' . rex_escape($searchTerm) . '">
                                         <span class="input-group-btn">
                                             <button type="submit" class="btn btn-primary"><i class="rex-icon fa-search"></i></button>
                                             <button type="submit" name="action" value="delete_results" class="btn btn-danger"
@@ -456,10 +484,17 @@ if ($editId || $addMode) {
         $fragment->setVar('title', 'Aktionen');
         $fragment->setVar('body', $actionContent, false);
         $content .= $fragment->parse('core/page/section.php');
+
         // Records list
-        $listQuery = rex_sql::factory();
-        $listQuery->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
-        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
+        $list = rex_list::factory($selectedTable, 30);
+        $list->setNoDataMessage('Keine Datensätze gefunden.');
+
+        // Überprüfen, ob Suchergebnisse vorliegen und diese verwenden
+        if (!empty($searchResults)) {
+            $list->setDataset($searchResults);
+        } else {
+             $list->setQuery('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC');
+        }
 
         // Add actions column
         $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
@@ -467,19 +502,28 @@ if ($editId || $addMode) {
         $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
             $editUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
-                'edit_id' => $params['list']->getValue('id')
+                'edit_id' => $params['list']->getValue('id'),
+                'search_term' => $searchTerm,
+                'search_column' => $searchColumn,
+                'search_type' => $searchType
             ]);
 
             $copyUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
                 'func' => 'add',
-                'id' => $params['list']->getValue('id')
+                'id' => $params['list']->getValue('id'),
+                'search_term' => $searchTerm,
+                'search_column' => $searchColumn,
+                'search_type' => $searchType
             ]);
 
             $deleteUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
                 'record_action' => 'delete',
-                'record_id' => $params['list']->getValue('id')
+                'record_id' => $params['list']->getValue('id'),
+                 'search_term' => $searchTerm,
+                 'search_column' => $searchColumn,
+                 'search_type' => $searchType
             ]) /*. '&' . $csrfToken->getUrlParams()*/;
 
             return '
@@ -544,7 +588,9 @@ if ($editId || $addMode) {
         $content .= '
         <div class="panel panel-default">
             <div class="panel-body">
-                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']) . '" class="btn btn-save">
+                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add', 'search_term' => $searchTerm,
+                                                      'search_column' => $searchColumn,
+                                                      'search_type' => $searchType]) . '" class="btn btn-save">
                     <i class="rex-icon fa-plus"></i> Neuer Datensatz
                 </a>
             </div>
