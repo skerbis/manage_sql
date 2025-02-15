@@ -19,9 +19,10 @@ if (!$table->exists()) {
 if (rex_post('updatetable', 'boolean')) {
     $columns = rex_post('columns', 'array');
     
+    $sql = rex_sql::factory();
+    
     try {
         // Start transaction
-        $sql = rex_sql::factory();
         $sql->beginTransaction();
         
         foreach ($columns as $columnName => $column) {
@@ -78,7 +79,9 @@ if (rex_post('updatetable', 'boolean')) {
         $table = rex_sql_table::get($tableName);
         
     } catch (Exception $e) {
-        $sql->rollBack();
+        if ($sql->inTransaction()) {
+            $sql->rollBack();
+        }
         $error = $e->getMessage();
     }
 }
