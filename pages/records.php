@@ -453,40 +453,34 @@ $actionContent .= '
         $fragment->setVar('body', $actionContent, false);
         $content .= $fragment->parse('core/page/section.php');
 
-        // Build base query for list
-        $listQuery = 'SELECT * FROM ' . $selectedTable;
-        $listParams = [];
+// Build base query for list
+        $listQuery = rex_sql::factory();
+        $whereParams = [];
+        $queryWhere = '';
 
         // Apply search filter if exists
         if ($searchData = rex_session('table_records_search', 'array')) {
-            $where = '';
             switch ($searchData['type']) {
                 case 'exact':
-                    $where = $searchData['column'] . ' = :term';
-                    $listParams['term'] = $searchData['term'];
+                    $queryWhere = ' WHERE ' . $searchData['column'] . ' = :term';
+                    $whereParams['term'] = $searchData['term'];
                     break;
                 case 'starts':
-                    $where = $searchData['column'] . ' LIKE :term';
-                    $listParams['term'] = $searchData['term'] . '%';
+                    $queryWhere = ' WHERE ' . $searchData['column'] . ' LIKE :term';
+                    $whereParams['term'] = $searchData['term'] . '%';
                     break;
                 case 'ends':
-                    $where = $searchData['column'] . ' LIKE :term';
-                    $listParams['term'] = '%' . $searchData['term'];
+                    $queryWhere = ' WHERE ' . $searchData['column'] . ' LIKE :term';
+                    $whereParams['term'] = '%' . $searchData['term'];
                     break;
                 default: // contains
-                    $where = $searchData['column'] . ' LIKE :term';
-                    $listParams['term'] = '%' . $searchData['term'] . '%';
-            }
-            
-            if ($where) {
-                $listQuery .= ' WHERE ' . $where;
+                    $queryWhere = ' WHERE ' . $searchData['column'] . ' LIKE :term';
+                    $whereParams['term'] = '%' . $searchData['term'] . '%';
             }
         }
 
-        $listQuery .= ' ORDER BY id DESC';
-
-        // Create list with filtered query
-        $list = rex_list::factory($listQuery, 30, '', $listParams);
+        $query = 'SELECT * FROM ' . $selectedTable . $queryWhere . ' ORDER BY id DESC';
+        $list = rex_list::factory($query, 30, '', $whereParams);
 
         // Add actions column
         $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
