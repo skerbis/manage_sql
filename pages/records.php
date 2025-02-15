@@ -180,7 +180,7 @@ if ($action /*&& !$csrfToken->isValid()*/) {
 
                 if ($data && $recordId) {
                     $sql->setTable($selectedTable);
-                    $sql->setWhere(['id' => $recordId]);
+                    $sql->setWhere([$primaryKey => $recordId]); // Use primary key here
                     $sql->setValues($data);
                     $sql->update();
                     $message = 'Datensatz gespeichert.';
@@ -222,7 +222,7 @@ if ($recordAction && $recordId /*&& $csrfToken->isValid()*/) {
                     var_dump($recordId);
                     echo '</pre>';
                 }
-                $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
+                $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE '.$primaryKey.' = :id', ['id' => $recordId]);
                 if ($debug) {
                     echo '<pre>';
                     echo '<b>Debug Single Record Delete After SQL:</b><br>';
@@ -277,13 +277,27 @@ $content .= $fragment->parse('core/page/section.php');
 $editId = rex_request('edit_id', 'int', 0);
 $addMode = rex_get('func') === 'add';
 
+// Get primary key column
+$columns = rex_sql::showColumns($selectedTable);
+$primaryKey = 'id'; // Default to 'id'
+
+foreach ($columns as $column) {
+    if ($column['name'] === 'id') {
+        $primaryKey = 'id';
+        break;
+    } else {
+         $primaryKey = $columns[0]['name']; // First column as default if no 'id'
+    }
+
+}
+
 // Show edit/add form if requested
 if ($editId || $addMode) {
     $sql = rex_sql::factory();
 
     if ($editId) {
         $sql->setTable($selectedTable);
-        $sql->setWhere(['id' => $editId]);
+        $sql->setWhere([$primaryKey => $editId]); // Use primary key here
         $sql->select();
     }
 
@@ -294,9 +308,8 @@ if ($editId || $addMode) {
                 ' . ($editId && !$addMode ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
                 ' /*. $csrfToken->getHiddenField()*/;
 
-        $columns = rex_sql::showColumns($selectedTable);
         foreach ($columns as $column) {
-            if ($column['name'] === 'id') continue;
+            if ($column['name'] === $primaryKey) continue; // Skip primary key in edit form
 
             $label = ucfirst(str_replace('_', ' ', $column['name']));
             $value = $editId ? $sql->getValue($column['name']) : '';
@@ -354,8 +367,30 @@ if ($editId || $addMode) {
 
      // If table is selected and NOT in edit or add mode, show actions and list
     if ($selectedTable) {
+
         $columns = rex_sql::showColumns($selectedTable);
         $columnNames = array_column($columns, 'name');
+
+        // Determine primary key and sorting column
+        $primaryKey = 'id'; // Default
+        $sortColumn = 'id'; // Default
+
+        $hasIdColumn = false;
+
+        foreach ($columns as $column) {
+            if ($column['name'] === 'id') {
+                $primaryKey = 'id';
+                $sortColumn = 'id';
+                $hasIdColumn = true;
+                break; // Found 'id', stop searching
+            }
+        }
+
+        if (!$hasIdColumn && !empty($columns)) {
+            // If 'id' column doesn't exist, use the first column as primary key and sort column
+            $primaryKey = $columns[0]['name'];
+            $sortColumn = $columns[0]['name'];
+        }
 
         // Accordion for actions
         $actionContent = '
@@ -486,8 +521,15 @@ if ($editId || $addMode) {
         $content .= $fragment->parse('core/page/section.php');
 
         // Records list
-        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY id DESC', 30);
-        $list->setNoDataMessage('Keine Datensätze gefunden.');
+        $list = rex_list::factory('SELECT * FROM ' . $selectedTable . ' ORDER BY '.$sortColumn.' DESC', 30);
+
+        // Custom no data message
+        if (empty($searchResults)) {
+             $tableContent = '<p class="alert alert-warning">Keine Datensätze gefunden.</p>';
+        }else{
+
+            $tableContent = $list->get();
+        }
 
         // Überprüfen, ob Suchergebnisse vorliegen und diese verwenden
         if (!empty($searchResults)) {
@@ -497,10 +539,10 @@ if ($editId || $addMode) {
         // Add actions column
         $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
         $list->setColumnPosition('_actions', 0);
-        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken, $searchTerm, $searchColumn, $searchType) {
+        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken, $searchTerm, $searchColumn, $searchType, $primaryKey) {
             $editUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
-                'edit_id' => $params['list']->getValue('id'),
+                'edit_id' => $params['list']->getValue($primaryKey),
                 'search_term' => $searchTerm,
                 'search_column' => $searchColumn,
                 'search_type' => $searchType
@@ -509,7 +551,7 @@ if ($editId || $addMode) {
             $copyUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
                 'func' => 'add',
-                'id' => $params['list']->getValue('id'),
+                'id' => $params['list']->getValue($primaryKey),
                 'search_term' => $searchTerm,
                 'search_column' => $searchColumn,
                 'search_type' => $searchType
@@ -518,7 +560,7 @@ if ($editId || $addMode) {
             $deleteUrl = rex_url::currentBackendPage([
                 'table' => $selectedTable,
                 'record_action' => 'delete',
-                'record_id' => $params['list']->getValue('id'),
+                'record_id' => $params['list']->getValue($primaryKey),
                 'search_term' => $searchTerm,
                 'search_column' => $searchColumn,
                 'search_type' => $searchType
@@ -541,7 +583,7 @@ if ($editId || $addMode) {
         // Format columns based on data type
         foreach ($columns as $column) {
             $name = $column['name'];
-            if ($name === 'id') continue;
+            if ($name === $primaryKey) continue;
 
             // Truncate text fields if too long
             if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
@@ -574,8 +616,9 @@ if ($editId || $addMode) {
         }
 
         // Wrap table in custom wrapper div
+
         $list->addTableAttribute('class', 'table-striped');
-        $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
+        $tableContent = '<div class="table-responsive table-wrapper">' . $tableContent . '</div>';
 
         $fragment = new rex_fragment();
         $fragment->setVar('title', 'Datensätze');
