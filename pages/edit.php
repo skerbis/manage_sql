@@ -20,64 +20,56 @@ if (rex_post('updatetable', 'boolean')) {
     $columns = rex_post('columns', 'array');
     
     $sql = rex_sql::factory();
-    $transactionStarted = false;
     
     try {
-        // Start transaction
-        $sql->beginTransaction();
-        $transactionStarted = true;
-        
-        foreach ($columns as $columnName => $column) {
-            if (isset($column['delete']) && $column['delete']) {
-                // Delete column
-                $table->removeColumn($columnName);
-                continue;
-            }
-            
-            // Check if column should be renamed
-            $newName = $column['new_name'] ?? '';
-            if (!empty($newName) && $newName !== $columnName) {
-                // Check if new name already exists
-                if ($table->hasColumn($newName)) {
-                    throw new rex_exception(sprintf('Eine Spalte mit dem Namen "%s" existiert bereits.', $newName));
+        $sql->transactional(function() use ($columns, $table, &$tableName) {
+            foreach ($columns as $columnName => $column) {
+                if (isset($column['delete']) && $column['delete']) {
+                    // Delete column
+                    $table->removeColumn($columnName);
+                    continue;
                 }
-                // Rename column
-                $table->renameColumn($columnName, $newName);
-                $columnName = $newName;
-            }
-            
-            // Update column
-            $table->ensureColumn(new rex_sql_column(
-                $columnName,
-                $column['type'],
-                (bool)($column['nullable'] ?? false),
-                $column['default'] ?? null,
-                $column['extra'] ?? null,
-                $column['comment'] ?? null
-            ));
-        }
-        
-        // Add new column if data exists
-        if ($newColumn = rex_post('new_column', 'array')) {
-            if (!empty($newColumn['name']) && !empty($newColumn['type'])) {
+                
+                // Check if column should be renamed
+                $newName = $column['new_name'] ?? '';
+                if (!empty($newName) && $newName !== $columnName) {
+                    // Check if new name already exists
+                    if ($table->hasColumn($newName)) {
+                        throw new rex_exception(sprintf('Eine Spalte mit dem Namen "%s" existiert bereits.', $newName));
+                    }
+                    // Rename column
+                    $table->renameColumn($columnName, $newName);
+                    $columnName = $newName;
+                }
+                
+                // Update column
                 $table->ensureColumn(new rex_sql_column(
-                    $newColumn['name'],
-                    $newColumn['type'],
-                    (bool)($newColumn['nullable'] ?? false),
-                    $newColumn['default'] ?? null,
-                    $newColumn['extra'] ?? null,
-                    $newColumn['comment'] ?? null
+                    $columnName,
+                    $column['type'],
+                    (bool)($column['nullable'] ?? false),
+                    $column['default'] ?? null,
+                    $column['extra'] ?? null,
+                    $column['comment'] ?? null
                 ));
             }
-        }
-        
-        // Save changes
-        $table->ensure();
-        
-        if ($transactionStarted) {
-            $sql->commit();
-            $transactionStarted = false;
-        }
+            
+            // Add new column if data exists
+            if ($newColumn = rex_post('new_column', 'array')) {
+                if (!empty($newColumn['name']) && !empty($newColumn['type'])) {
+                    $table->ensureColumn(new rex_sql_column(
+                        $newColumn['name'],
+                        $newColumn['type'],
+                        (bool)($newColumn['nullable'] ?? false),
+                        $newColumn['default'] ?? null,
+                        $newColumn['extra'] ?? null,
+                        $newColumn['comment'] ?? null
+                    ));
+                }
+            }
+            
+            // Save changes
+            $table->ensure();
+        });
         
         $message = 'Tabelle wurde erfolgreich aktualisiert.';
         
@@ -85,10 +77,6 @@ if (rex_post('updatetable', 'boolean')) {
         $table = rex_sql_table::get($tableName);
         
     } catch (Exception $e) {
-        if ($transactionStarted) {
-            $sql->rollBack();
-            $transactionStarted = false;
-        }
         $error = $e->getMessage();
     }
 }
