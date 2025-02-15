@@ -31,7 +31,19 @@ if (rex_post('updatetable', 'boolean')) {
                 continue;
             }
             
-            // Update or add column
+            // Check if column should be renamed
+            $newName = $column['new_name'] ?? '';
+            if (!empty($newName) && $newName !== $columnName) {
+                // Check if new name already exists
+                if ($table->hasColumn($newName)) {
+                    throw new rex_exception(sprintf('Eine Spalte mit dem Namen "%s" existiert bereits.', $newName));
+                }
+                // Rename column
+                $table->renameColumn($columnName, $newName);
+                $columnName = $newName;
+            }
+            
+            // Update column
             $table->ensureColumn(new rex_sql_column(
                 $columnName,
                 $column['type'],
@@ -103,25 +115,31 @@ foreach ($columns as $column) {
         </div>
         <div class="panel-body">
             <div class="row">
-                <div class="col-sm-4">
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <label>Neuer Name:</label>
+                        <input type="text" name="columns['.$name.'][new_name]" value="'.$name.'" class="form-control" placeholder="Spalte umbenennen">
+                    </div>
+                </div>
+                <div class="col-sm-3">
                     <div class="form-group">
                         <label>Typ:</label>
                         <select name="columns['.$name.'][type]" class="form-control">';
                         
-foreach (manage_sql::getCommonColumnTypes() as $type => $label) {
+foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
     $formContent .= '<option value="'.$type.'"'.($column->getType() === $type ? ' selected' : '').'>'.$label.'</option>';
 }
 
 $formContent .= '</select>
                     </div>
                 </div>
-                <div class="col-sm-3">
+                <div class="col-sm-2">
                     <div class="form-group">
                         <label>Standardwert:</label>
                         <input type="text" name="columns['.$name.'][default]" value="'.$column->getDefault().'" class="form-control">
                     </div>
                 </div>
-                <div class="col-sm-3">
+                <div class="col-sm-2">
                     <div class="form-group">
                         <label>Extra:</label>
                         <input type="text" name="columns['.$name.'][extra]" value="'.$column->getExtra().'" class="form-control">
@@ -157,7 +175,7 @@ $newColumnForm = '<div class="column-row panel panel-info">
                 <div class="form-group">
                     <label>Typ:</label>
                     <select name="new_column[type]" class="form-control">';
-foreach (manage_sql::getCommonColumnTypes() as $type => $label) {
+foreach (rex_table_builder::getCommonColumnTypes() as $type => $label) {
     $newColumnForm .= '<option value="'.$type.'">'.$label.'</option>';
 }
 $newColumnForm .= '</select>
@@ -193,7 +211,7 @@ $fragment->setVar('body', '
             <div class="rex-form-panel-footer">
                 <div class="btn-toolbar">
                     <button type="submit" name="updatetable" value="1" class="btn btn-save">Speichern</button>
-                    <a class="btn btn-default" href="'.rex_url::backendPage('manage_sql/tables').'">Abbrechen</a>
+                    <a class="btn btn-default" href="'.rex_url::backendPage('table_builder/tables').'">Abbrechen</a>
                 </div>
             </div>
         </div>
