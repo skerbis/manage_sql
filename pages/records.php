@@ -238,6 +238,18 @@ if ($selectedTable) {
     echo '<pre>selectedTable: ' . $selectedTable . '</pre>'; // Debug Table Name
 }
 
+// --- ADDED: Reset Filter Button (Outside Accordion) ---
+if ($searchData) {
+    $resetUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'reset_search' => 1]);
+    $content .= '
+        <div class="alert alert-info">
+            Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong> ' . rex_escape($searchData['term']) . '
+            <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right">
+                <i class="rex-icon fa-times"></i> Filter zurücksetzen
+            </a>
+        </div>';
+}
+
 // Show edit/add form if requested
 if ($editId || $addMode) {
     if ($editId) {
@@ -321,20 +333,6 @@ if ($editId || $addMode) {
                 </div>
                 <div id="collapseSearch" class="panel-collapse collapse">
                     <div class="panel-body">';
-
-        // Show active filter if exists
-        if ($searchData) {
-            $resetUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'reset_search' => 1]);
-
-            $actionContent .= '
-                <div class="alert alert-info">
-                    Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong>
-                    ' . rex_escape($searchData['term']) . '
-                    <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right">
-                        <i class="rex-icon fa-times"></i> Filter zurücksetzen
-                    </a>
-                </div>';
-        }
 
         $formAction = rex_url::currentBackendPage(['table' => $selectedTable]);
         $actionContent .= '
