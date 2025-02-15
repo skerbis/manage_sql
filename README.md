@@ -6,6 +6,8 @@ Table Builder ist ein REDAXO-AddOn zur vereinfachten Arbeit mit Datenbanktabelle
 
 ### Datenbank-Management
 - Visuelle Erstellung und Bearbeitung von Datenbanktabellen
+- Erstellen und Bearbeiten von Datensätzen
+- Suchen und Ersetzen in Values
 - Automatische Erstellung von korrekten Tabellenstrukturen inkl. Primärschlüssel
 - Verwaltung von Spaltentypen, Indizes und Fremdschlüsseln
 
