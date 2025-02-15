@@ -26,6 +26,7 @@ $sql = rex_sql::factory();
 $sql->setDebug($debug);
 
 // --- Functions ---
+
 /**
  * Builds a WHERE clause based on search parameters.
  *
@@ -58,6 +59,23 @@ function buildWhereClause(string $column, string $term, string $type, rex_sql $s
     }
 
     return ['where' => $where, 'params' => []]; // No parameters needed anymore
+}
+
+/**
+ * Generates a single record action button.
+ *
+ * @param string $url The URL for the action.
+ * @param string $iconClass The Font Awesome icon class.
+ * @param string $title The title of the button.
+ * @param bool $confirmation Whether to show a confirmation dialog.
+ * @param string $cssClass Additional CSS classes for the button.
+ *
+ * @return string The HTML for the action button.
+ */
+function getActionButton(string $url, string $iconClass, string $title, bool $confirmation = false, string $cssClass = ''): string
+{
+    $onclick = $confirmation ? 'return confirm(\'' . $confirmation . '\')' : '';
+    return '<a href="' . $url . '" class="btn ' . $cssClass . ' btn-xs" title="' . $title . '" onclick="' . $onclick . '"><i class="rex-icon ' . $iconClass . '"></i></a>';
 }
 
 // --- ACTION HANDLER ---
