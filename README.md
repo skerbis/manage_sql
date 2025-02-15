@@ -93,9 +93,7 @@ class Example extends rex_yform_manager_dataset
 ```
 
 ## Unterstützung & Bugs
-
-Fehler bitte im GitHub-Repository melden:
-https://github.com/alexplusde/manage_sql
+noch unklar
 
 ## Lizenz
 
