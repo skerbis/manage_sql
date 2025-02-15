@@ -1,4 +1,7 @@
 <?php
+
+use Symfony\Component\Mime\Message;
+
 $content = '';
 $message = '';
 $error = '';
@@ -9,24 +12,88 @@ $debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
+$recordAction = rex_get('record_action', 'string');
+$recordId = rex_get('record_id', 'int');
+$editId = rex_request('edit_id', 'int', 0);
+$addMode = rex_get('func') === 'add';
+$searchData = rex_session('table_records_search', 'array');
 
 // CSRF protection
 $csrfToken = rex_csrf_token::factory('table_records');
 
-// Handle actions when form is submitted
+// SQL instance
+$sql = rex_sql::factory();
+$sql->setDebug($debug);
+
+
+// --- Functions ---
+/**
+ * Builds a WHERE clause based on search parameters.
+ *
+ * @param string $column The column to search in.
+ * @param string $term The search term.
+ * @param string $type The search type (exact, starts, ends, contains).
+ *
+ * @return array An associative array containing the WHERE clause and parameters.
+ */
+function buildWhereClause(string $column, string $term, string $type): array
+{
+    $where = '';
+    $params = [];
+
+    if ($column && $term) {
+        switch ($type) {
+            case 'exact':
+                $where = '`' . rex_escape($column) . '` = :term';
+                $params['term'] = $term;
+                break;
+            case 'starts':
+                $where = '`' . rex_escape($column) . '` LIKE :term';
+                $params['term'] = $term . '%';
+                break;
+            case 'ends':
+                $where = '`' . rex_escape($column) . '` LIKE :term';
+                $params['term'] = '%' . $term;
+                break;
+            default: // contains
+                $where = '`' . rex_escape($column) . '` LIKE :term';
+                $params['term'] = '%' . $term . '%';
+        }
+    }
+
+    return ['where' => $where, 'params' => $params];
+}
+
+
+/**
+ * Generates a single record action button.
+ *
+ * @param string $url The URL for the action.
+ * @param string $iconClass The Font Awesome icon class.
+ * @param string $title The title of the button.
+ * @param bool $confirmation Whether to show a confirmation dialog.
+ * @param string $cssClass Additional CSS classes for the button.
+ *
+ * @return string The HTML for the action button.
+ */
+function getActionButton(string $url, string $iconClass, string $title, bool $confirmation = false, string $cssClass = ''): string
+{
+    $onclick = $confirmation ? 'return confirm(\'' . $confirmation . '\')' : '';
+    return '<a href="' . $url . '" class="btn ' . $cssClass . ' btn-xs" title="' . $title . '" onclick="' . $onclick . '"><i class="rex-icon ' . $iconClass . '"></i></a>';
+}
+
+// --- ACTION HANDLER ---
+
 if ($action && !$csrfToken->isValid()) {
     $error = rex_i18n::msg('csrf_token_invalid');
 } elseif ($action) {
-    $sql = rex_sql::factory();
-    $sql->setDebug($debug);
-
     try {
         switch ($action) {
             case 'search':
                 $searchColumn = rex_post('search_column', 'string');
                 $searchTerm = rex_post('search_term', 'string');
                 $searchType = rex_post('search_type', 'string');
-                
+
                 // Save search params in session
                 $searchData = [
                     'column' => $searchColumn,
@@ -34,29 +101,13 @@ if ($action && !$csrfToken->isValid()) {
                     'type' => $searchType
                 ];
                 rex_set_session('table_records_search', $searchData);
-                
+
                 // Build WHERE clause based on search type
-                $where = '';
-                $params = [];
-                if ($searchColumn && $searchTerm) {
-                    switch ($searchType) {
-                        case 'exact':
-                            $where = $searchColumn . ' = :term';
-                            $params['term'] = $searchTerm;
-                            break;
-                        case 'starts':
-                            $where = $searchColumn . ' LIKE :term';
-                            $params['term'] = $searchTerm . '%';
-                            break;
-                        case 'ends':
-                            $where = $searchColumn . ' LIKE :term';
-                            $params['term'] = '%' . $searchTerm;
-                            break;
-                        default: // contains
-                            $where = $searchColumn . ' LIKE :term';
-                            $params['term'] = '%' . $searchTerm . '%';
-                    }
-                    
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType);
+                $where = $whereData['where'];
+                $params = $whereData['params'];
+
+                if ($where) {
                     $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where, $params);
                     $count = $sql->getValue('count');
                     $message = $count . ' Datensätze gefunden.';
@@ -67,11 +118,11 @@ if ($action && !$csrfToken->isValid()) {
                 $replaceColumn = rex_post('replace_column', 'string');
                 $searchTerm = rex_post('search_term', 'string');
                 $replaceTerm = rex_post('replace_term', 'string');
-                
+
                 if ($replaceColumn && $searchTerm) {
                     $sql->setQuery(
                         'UPDATE ' . $selectedTable . ' 
-                         SET ' . $replaceColumn . ' = REPLACE(' . $replaceColumn . ', :search, :replace)',
+                         SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
                         ['search' => $searchTerm, 'replace' => $replaceTerm]
                     );
                     $message = $sql->getRows() . ' Datensätze aktualisiert.';
@@ -83,49 +134,21 @@ if ($action && !$csrfToken->isValid()) {
                 $searchTerm = rex_post('search_term', 'string');
                 $searchType = rex_post('search_type', 'string');
 
-                if ($debug) {
-                    error_log('Debug Delete Results:');
-                    error_log('searchColumn: ' . $searchColumn);
-                    error_log('searchTerm: ' . $searchTerm);
-                    error_log('searchType: ' . $searchType);
-                }
-                
-                if ($searchColumn && $searchTerm) {
-                    $where = '';
-                    $params = [];
-                    switch ($searchType) {
-                        case 'exact':
-                            $where = $searchColumn . ' = :term';
-                            $searchTerm = $searchTerm;
-                            break;
-                        case 'starts':
-                            $where = $searchColumn . ' LIKE :term';
-                            $searchTerm = $searchTerm . '%';
-                            break;
-                        case 'ends':
-                            $where = $searchColumn . ' LIKE :term';
-                            $searchTerm = '%' . $searchTerm;
-                            break;
-                        default: // contains
-                            $where = $searchColumn . ' LIKE :term';
-                            $searchTerm = '%' . $searchTerm . '%';
-                    }
+                // Build WHERE clause based on search type
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType);
+                $where = $whereData['where'];
+                $params = $whereData['params'];
 
-                    $params['term'] = $searchTerm;
-                    
+                if ($where) {
                     try {
                         // First count matching records
                         $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where, $params);
                         $count = $sql->getValue('count');
-                        
+
                         // Then delete
                         $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE ' . $where, $params);
                         $message = $count . ' Datensätze gelöscht.';
-
                     } catch (rex_sql_exception $e) {
-                        if ($debug) {
-                            error_log('SQL Exception during delete: ' . $e->getMessage());
-                        }
                         $error = $e->getMessage();
                     }
                 }
@@ -135,28 +158,23 @@ if ($action && !$csrfToken->isValid()) {
                 $sql->setQuery('TRUNCATE TABLE ' . $selectedTable);
                 $message = 'Tabelle wurde geleert.';
                 break;
-                
+
             case 'save':
-                $data = rex_post('data', 'array', []);
-                $recordId = rex_post('record_id', 'int');
-                
-                if ($data && $recordId) {
-                    $sql->setTable($selectedTable);
-                    $sql->setWhere(['id' => $recordId]);
-                    $sql->setValues($data);
-                    $sql->update();
-                    $message = 'Datensatz gespeichert.';
-                }
-                break;
-                
             case 'create':
                 $data = rex_post('data', 'array', []);
-                
+
                 if ($data) {
                     $sql->setTable($selectedTable);
-                    $sql->setValues($data);
-                    $sql->insert();
-                    $message = 'Datensatz erstellt.';
+                    if ($action === 'save') {
+                        $sql->setWhere(['id' => rex_post('record_id', 'int')]);
+                        $sql->setValues($data);
+                        $sql->update();
+                        $message = 'Datensatz gespeichert.';
+                    } else {
+                        $sql->setValues($data);
+                        $sql->insert();
+                        $message = 'Datensatz erstellt.';
+                    }
                 }
                 break;
         }
@@ -166,22 +184,11 @@ if ($action && !$csrfToken->isValid()) {
 }
 
 // Handle single record actions
-$recordAction = rex_get('record_action', 'string');
-$recordId = rex_get('record_id', 'int');
-
 if ($recordAction && $recordId && $csrfToken->isValid()) {
-    $sql = rex_sql::factory();
-
     try {
-        switch ($recordAction) {
-            case 'delete':
-                if ($debug) {
-                    error_log('Debug Single Record Delete:');
-                    error_log('recordId: ' . $recordId);
-                }
-                $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
-                $message = 'Datensatz gelöscht.';
-                break;
+        if ($recordAction === 'delete') {
+            $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
+            $message = 'Datensatz gelöscht.';
         }
     } catch (rex_sql_exception $e) {
         $error = $e->getMessage();
@@ -191,10 +198,10 @@ if ($recordAction && $recordId && $csrfToken->isValid()) {
 // Handle search reset
 if (rex_get('reset_search', 'bool')) {
     rex_unset_session('table_records_search');
+    $searchData = []; // Reset $searchData as well
 }
 
 // Get all tables
-$sql = rex_sql::factory();
 $tables = $sql->getTablesAndViews();
 $tables = array_filter($tables, function ($table) {
     return str_starts_with($table, 'rex_');
@@ -219,7 +226,8 @@ $formContent = '
                 <select name="table" id="table" class="form-control" onchange="this.form.submit()">
                     <option value="">Bitte wählen...</option>';
 foreach ($tables as $table) {
-    $formContent .= '<option value="' . $table . '"' . ($selectedTable === $table ? ' selected' : '') . '>' . $table . '</option>';
+    $selected = ($selectedTable === $table) ? ' selected' : '';
+    $formContent .= '<option value="' . $table . '"' . $selected . '>' . $table . '</option>';
 }
 $formContent .= '</select></div></div></div></form>';
 
@@ -228,14 +236,9 @@ $fragment->setVar('title', 'Tabelle auswählen');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
 
-// Check if we're in edit mode
-$editId = rex_request('edit_id', 'int', 0);
-$addMode = rex_get('func') === 'add';
 
 // Show edit/add form if requested
 if ($editId || $addMode) {
-    $sql = rex_sql::factory();
-
     if ($editId) {
         $sql->setTable($selectedTable);
         $sql->setWhere(['id' => $editId]);
@@ -243,8 +246,9 @@ if ($editId || $addMode) {
     }
 
     if (!$editId || $sql->getRows()) {
+        $formAction = rex_url::currentBackendPage(['table' => $selectedTable]);
         $editForm = '
-            <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+            <form action="' . $formAction . '" method="post">
                 <input type="hidden" name="action" value="' . ($addMode ? 'create' : 'save') . '">
                 ' . ($editId && !$addMode ? '<input type="hidden" name="record_id" value="' . $editId . '">' : '') . '
                 ' . $csrfToken->getHiddenField();
@@ -255,42 +259,34 @@ if ($editId || $addMode) {
 
             $label = ucfirst(str_replace('_', ' ', $column['name']));
             $value = $editId ? $sql->getValue($column['name']) : '';
+            $columnName = $column['name'];
+
+            $editForm .= '<div class="form-group"><label>' . $label . '</label>';
+            $inputAttributes = 'name="data[' . $columnName . ']" class="form-control"'; // Default input attributes
 
             // Different input types based on column type
             if (strpos($column['type'], 'text') !== false) {
-                $editForm .= '
-                    <div class="form-group">
-                        <label>' . $label . '</label>
-                        <textarea name="data[' . $column['name'] . ']" class="form-control" rows="3">' . rex_escape($value) . '</textarea>
-                    </div>';
+                $editForm .= '<textarea ' . $inputAttributes . ' rows="3">' . rex_escape($value) . '</textarea>';
             } elseif (strpos($column['type'], 'datetime') !== false) {
-                $editForm .= '
-                    <div class="form-group">
-                        <label>' . $label . '</label>
-                        <input type="datetime-local" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00 00:00:00' ? date('Y-m-d\TH:i', strtotime($value)) : '') . '" class="form-control">
-                    </div>';
+                $dateTimeValue = ($value && $value != '0000-00-00 00:00:00') ? date('Y-m-d\TH:i', strtotime($value)) : '';
+                $editForm .= '<input type="datetime-local" ' . $inputAttributes . ' value="' . $dateTimeValue . '">';
             } elseif (strpos($column['type'], 'date') !== false) {
-                $editForm .= '
-                    <div class="form-group">
-                        <label>' . $label . '</label>
-                        <input type="date" name="data[' . $column['name'] . ']" value="' . ($value && $value != '0000-00-00' ? date('Y-m-d', strtotime($value)) : '') . '" class="form-control">
-                    </div>';
+                $dateValue = ($value && $value != '0000-00-00') ? date('Y-m-d', strtotime($value)) : '';
+                $editForm .= '<input type="date" ' . $inputAttributes . ' value="' . $dateValue . '">';
             } elseif (strpos($column['type'], 'tinyint(1)') !== false) {
+                $checked = $value ? ' checked' : '';
                 $editForm .= '
-                    <div class="form-group">
-                        <label class="checkbox">
-                            <input type="hidden" name="data[' . $column['name'] . ']" value="0">
-                            <input type="checkbox" name="data[' . $column['name'] . ']" value="1"' . ($value ? ' checked' : '') . '>
+                    <div class="checkbox">
+                        <label>
+                            <input type="hidden" name="data[' . $columnName . ']" value="0">
+                            <input type="checkbox" ' . $inputAttributes . ' value="1"' . $checked . '>
                             ' . $label . '
                         </label>
                     </div>';
             } else {
-                $editForm .= '
-                    <div class="form-group">
-                        <label>' . $label . '</label>
-                        <input type="text" name="data[' . $column['name'] . ']" value="' . rex_escape($value) . '" class="form-control">
-                    </div>';
+                $editForm .= '<input type="text" ' . $inputAttributes . ' value="' . rex_escape($value) . '">';
             }
+            $editForm .= '</div>';
         }
 
         $editForm .= '
@@ -326,29 +322,29 @@ if ($editId || $addMode) {
                     <div class="panel-body">';
 
         // Show active filter if exists
-        if ($searchData = rex_session('table_records_search', 'array')) {
+        if ($searchData) {
+            $resetUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'reset_search' => 1]);
+
             $actionContent .= '
                 <div class="alert alert-info">
                     Aktiver Filter: <strong>' . rex_escape($searchData['column']) . '</strong> 
                     ' . rex_escape($searchData['term']) . '
-                    <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'reset_search' => 1]) . '" 
-                       class="btn btn-default btn-xs pull-right">
+                    <a href="' . $resetUrl . '" class="btn btn-default btn-xs pull-right">
                         <i class="rex-icon fa-times"></i> Filter zurücksetzen
                     </a>
                 </div>';
         }
-$actionContent .= '
-                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+
+        $formAction = rex_url::currentBackendPage(['table' => $selectedTable]);
+        $actionContent .= '
+                        <form action="' . $formAction . '" method="post">
                             <input type="hidden" name="action" value="search">
                             <div class="row">
                                 <div class="col-sm-4">
                                     <select name="search_column" class="form-control" required>
                                         <option value="">Spalte wählen...</option>';
         foreach ($columnNames as $column) {
-            $selected = '';
-            if (isset($searchData['column']) && $searchData['column'] === $column) {
-                $selected = ' selected';
-            }
+            $selected = (isset($searchData['column']) && $searchData['column'] === $column) ? ' selected' : '';
             $actionContent .= '<option value="' . $column . '"' . $selected . '>' . $column . '</option>';
         }
         $actionContent .= '
@@ -391,7 +387,7 @@ $actionContent .= '
                 </div>
                 <div id="collapseReplace" class="panel-collapse collapse">
                     <div class="panel-body">
-                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                        <form action="' . $formAction . '" method="post">
                             <input type="hidden" name="action" value="replace">
                             <div class="row">
                                 <div class="col-sm-4">
@@ -433,7 +429,7 @@ $actionContent .= '
                 </div>
                 <div id="collapseTruncate" class="panel-collapse collapse">
                     <div class="panel-body">
-                        <form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post">
+                        <form action="' . $formAction . '" method="post">
                             <input type="hidden" name="action" value="truncate">
                             <p class="alert alert-warning">
                                 Diese Aktion löscht <strong>alle</strong> Datensätze aus der Tabelle. Dies kann nicht rückgängig gemacht werden!
@@ -453,138 +449,100 @@ $actionContent .= '
         $fragment->setVar('body', $actionContent, false);
         $content .= $fragment->parse('core/page/section.php');
 
-// Build base query for list
+        // Build base query for list
         $whereCondition = '';
+        $params = [];
 
         // Apply search filter if exists
-        if ($searchData = rex_session('table_records_search', 'array')) {
-            $sql = rex_sql::factory();
-            $sql->setDebug($debug);
-            
-            $column = '`' . $searchData['column'] . '`'; // Backticks für Spaltennamen
-            
-            switch ($searchData['type']) {
-                case 'exact':
-                    $whereCondition = ' WHERE ' . $column . ' = ' . $sql->escape($searchData['term']);
-                    break;
-                case 'starts':
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape($searchData['term'] . '%');
-                    break;
-                case 'ends':
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $searchData['term']);
-                    break;
-                default: // contains
-                    $whereCondition = ' WHERE ' . $column . ' LIKE ' . $sql->escape('%' . $searchData['term'] . '%');
-            }
-            
-            if ($debug) {
-                echo '<pre>Search Data: ';
-                print_r($searchData);
-                echo '<br>Where Condition: ' . $whereCondition;
-                echo '</pre>';
-            }
-        
+        if ($searchData) {
+            $whereData = buildWhereClause($searchData['column'], $searchData['term'], $searchData['type']);
+            $whereCondition = ' WHERE ' . $whereData['where'];
+            $params = $whereData['params'];
+        }
+
 
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
-        
-        if ($debug) {
-            echo '<pre>Final Query: ' . $query . '</pre>';
-        }
-        
+
         try {
             $list = rex_list::factory($query);
 
-        $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
-        $list = rex_list::factory($query);
+            // Add actions column
+            $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
+            $list->setColumnPosition('_actions', 0);
 
-        // Add actions column
-        $list->addColumn('_actions', '', -1, ['<th class="rex-table-action">Aktionen</th>', '<td class="rex-table-action">###VALUE###</td>']);
-        $list->setColumnPosition('_actions', 0);
-        $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
-            $editUrl = rex_url::currentBackendPage([
-                'table' => $selectedTable,
-                'edit_id' => $params['list']->getValue('id')
-            ]);
+            $list->setColumnFormat('_actions', 'custom', function ($params) use ($selectedTable, $csrfToken) {
+                $id = $params['list']->getValue('id');
 
-            $copyUrl = rex_url::currentBackendPage([
-                'table' => $selectedTable,
-                'func' => 'add',
-                'id' => $params['list']->getValue('id')
-            ]);
+                $editUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'edit_id' => $id]);
+                $copyUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add', 'id' => $id]);
+                $deleteUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'record_action' => 'delete', 'record_id' => $id]) . '&' . $csrfToken->getUrlParams();
 
-            $deleteUrl = rex_url::currentBackendPage([
-                'table' => $selectedTable,
-                'record_action' => 'delete',
-                'record_id' => $params['list']->getValue('id')
-            ]) . '&' . $csrfToken->getUrlParams();
+                $editButton = getActionButton($editUrl, 'fa-edit', 'Bearbeiten', false, 'btn-edit');
+                $copyButton = getActionButton($copyUrl, 'fa-copy', 'Kopieren');
+                $deleteButton = getActionButton($deleteUrl, 'fa-trash', 'Löschen', 'Wirklich löschen?', 'btn-delete');
 
-            return '
-            <div class="btn-group">
-                <a href="' . $editUrl . '" class="btn btn-edit btn-xs" title="Bearbeiten">
-                    <i class="rex-icon fa-edit"></i>
-                </a>
-                <a href="' . $copyUrl . '" class="btn btn-default btn-xs" title="Kopieren">
-                    <i class="rex-icon fa-copy"></i>
-                </a>
-                <a href="' . $deleteUrl . '" class="btn btn-delete btn-xs" onclick="return confirm(\'Wirklich löschen?\')" title="Löschen">
-                    <i class="rex-icon fa-trash"></i>
-                </a>
-            </div>';
-        });
+                return '<div class="btn-group">' . $editButton . $copyButton . $deleteButton . '</div>';
+            });
 
-        // Format columns based on data type
-        foreach ($columns as $column) {
-            $name = $column['name'];
-            if ($name === 'id') continue;
 
-            // Truncate text fields if too long
-            if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
-                $list->setColumnFormat($name, 'custom', function ($params) {
-                    $value = $params['value'];
-                    if ($value && strlen($value) > 100) {
-                        $value = substr($value, 0, 100) . '...';
-                    }
-                    return rex_escape($value);
-                });
+            // Format columns based on data type
+            foreach ($columns as $column) {
+                $name = $column['name'];
+                if ($name === 'id') continue;
+
+                // Truncate text fields if too long
+                if (strpos($column['type'], 'text') !== false || strpos($column['type'], 'varchar') !== false) {
+                    $list->setColumnFormat($name, 'custom', function ($params) {
+                        $value = $params['value'];
+                        if ($value && strlen($value) > 100) {
+                            $value = substr($value, 0, 100) . '...';
+                        }
+                        return rex_escape($value);
+                    });
+                }
+
+                // Format dates
+                if (strpos($column['type'], 'datetime') !== false) {
+                    $list->setColumnFormat($name, 'custom', function ($params) {
+                        $value = $params['value'];
+                        if ($value && $value != '0000-00-00 00:00:00') {
+                            return rex_formatter::strftime(strtotime($value), 'datetime');
+                        }
+                        return '';
+                    });
+                }
+
+                // Format boolean values
+                if (strpos($column['type'], 'tinyint(1)') !== false) {
+                    $list->setColumnFormat($name, 'custom', function ($params) {
+                        return $params['value'] ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
+                    });
+                }
             }
 
-            // Format dates
-            if (strpos($column['type'], 'datetime') !== false) {
-                $list->setColumnFormat($name, 'custom', function ($params) {
-                    $value = $params['value'];
-                    if ($value && $value != '0000-00-00 00:00:00') {
-                        return rex_formatter::strftime(strtotime($value), 'datetime');
-                    }
-                    return '';
-                });
-            }
+            // Wrap table in custom wrapper div
+            $list->addTableAttribute('class', 'table-striped');
+            $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
 
-            // Format boolean values
-            if (strpos($column['type'], 'tinyint(1)') !== false) {
-                $list->setColumnFormat($name, 'custom', function ($params) {
-                    return $params['value'] ? '<span class="text-success">✓</span>' : '<span class="text-danger">✗</span>';
-                });
-            }
+            $fragment = new rex_fragment();
+            $fragment->setVar('title', 'Datensätze' . ($searchData ? ' (gefiltert)' : ''));
+            $fragment->setVar('content', $tableContent, false);
+            $content .= $fragment->parse('core/page/section.php');
+
+            // Add "New Record" button if not editing
+            $addUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']);
+            $content .= '
+                <div class="panel panel-default">
+                    <div class="panel-body">
+                        <a href="' . $addUrl . '" class="btn btn-save">
+                            <i class="rex-icon fa-plus"></i> Neuer Datensatz
+                        </a>
+                    </div>
+                </div>';
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+            $content .= rex_view::error($error);
         }
-
-        // Wrap table in custom wrapper div
-        $list->addTableAttribute('class', 'table-striped');
-        $tableContent = '<div class="table-responsive table-wrapper">' . $list->get() . '</div>';
-
-        $fragment = new rex_fragment();
-        $fragment->setVar('title', 'Datensätze' . ($searchData ? ' (gefiltert)' : ''));
-        $fragment->setVar('content', $tableContent, false);
-        $content .= $fragment->parse('core/page/section.php');
-
-        // Add "New Record" button if not editing
-        $content .= '
-        <div class="panel panel-default">
-            <div class="panel-body">
-                <a href="' . rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add']) . '" class="btn btn-save">
-                    <i class="rex-icon fa-plus"></i> Neuer Datensatz
-                </a>
-            </div>
-        </div>';
     }
 }
 
