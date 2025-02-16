@@ -1,8 +1,8 @@
 <?php
-/** @var int $index */
-/** @var array{left_table: string, left_column: string, right_table: string, right_column: string, type: string} $join */
-/** @var list<string> $tables */
-/** @var callable(string): list<string> $columns */
+$index = $this->getVar('index');
+$join = $this->getVar('join');
+$tables = $this->getVar('tables');
+$columns = $this->getVar('columns');
 ?>
 <div class="panel panel-default">
     <div class="panel-heading">
