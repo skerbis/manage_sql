@@ -1,7 +1,7 @@
 <?php
-/** @var string $table */
-/** @var list<string> $columns */
-/** @var list<string> $selectedColumns */
+$table = $this->getVar('table');
+$columns = $this->getVar('columns');
+$selectedColumns = $this->getVar('selectedColumns');
 ?>
 <div class="panel panel-default">
     <div class="panel-heading">
