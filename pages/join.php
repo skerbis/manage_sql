@@ -98,6 +98,74 @@ if ($func) {
             rex_set_session('join_builder_columns', null);
             break;
 
+        case 'test_query':
+            $sql = rex_sql::factory();
+            try {
+                // Dieselbe Query-Generierung wie im 'generate' case
+                $selectParts = [];
+                foreach ($selectedColumns as $table => $columns) {
+                    foreach ($columns as $column) {
+                        $selectParts[] = $table . '.' . $column;
+                    }
+                }
+                $selectClause = empty($selectParts) ? '*' : implode(', ', $selectParts);
+                
+                $joinClauses = [];
+                $firstTable = '';
+                
+                foreach ($joins as $join) {
+                    if (empty($join['left_table']) || empty($join['right_table']) || 
+                        empty($join['left_column']) || empty($join['right_column'])) {
+                        continue;
+                    }
+                    
+                    if (empty($firstTable)) {
+                        $firstTable = $join['left_table'];
+                    }
+                    
+                    $joinClauses[] = sprintf(
+                        '%s %s ON %s.%s = %s.%s',
+                        $join['type'],
+                        $join['right_table'],
+                        $join['left_table'],
+                        $join['left_column'],
+                        $join['right_table'],
+                        $join['right_column']
+                    );
+                }
+                
+                if ($firstTable) {
+                    $query = sprintf('SELECT %s FROM %s %s',
+                        $selectClause,
+                        $firstTable,
+                        implode("\n", $joinClauses)
+                    );
+
+                    // Query ausführen und Ergebnis anzeigen
+                    $list = rex_list::factory($query);
+                    $list->addTableAttribute('class', 'table-striped table-hover');
+                    
+                    // Test-Ergebnis anzeigen
+                    $fragment = new rex_fragment();
+                    $fragment->setVar('title', 'Query Test Ergebnis');
+                    $fragment->setVar('content', '
+                        <div class="panel-body">
+                            <p><strong>Ausgeführte Query:</strong></p>
+                            <pre>' . rex_escape($query) . '</pre>
+                            <hr>
+                            <div class="table-responsive">
+                                ' . $list->get() . '
+                            </div>
+                        </div>', false);
+                    $testResult = $fragment->parse('core/page/section.php');
+                    
+                    $message = 'Query wurde erfolgreich ausgeführt.';
+                }
+            } catch (rex_sql_exception $e) {
+                $error = 'Fehler beim Ausführen der Query: ' . $e->getMessage();
+            }
+            break;
+
         case 'generate':
             // Build SELECT part
             $selectParts = [];
@@ -210,12 +278,19 @@ foreach ($usedTables as $table) {
     $content .= $fragment->parse('column_selection.php');
 }
 
-// Generate button
+// Generate/Test buttons
 $generateUrl = rex_url::currentBackendPage(['func' => 'generate']);
+$testUrl = rex_url::currentBackendPage(['func' => 'test_query']);
 $content .= '
 <div class="btn-toolbar">
     <a class="btn btn-save" href="'.$generateUrl.'"><i class="rex-icon fa-save"></i> Code generieren</a>
+    <a class="btn btn-primary" href="'.$testUrl.'"><i class="rex-icon fa-play"></i> Query testen</a>
 </div>';
+
+// Show test result if available
+if (isset($testResult)) {
+    $content .= $testResult;
+}
 
 // Show generated code if available
 if (isset($generatedCode)) {
