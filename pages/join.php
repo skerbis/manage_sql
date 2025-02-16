@@ -1,8 +1,5 @@
 <?php
 $content = '';
-// Nach dem Titel, vor den JOINs
-$helpFragment = new rex_fragment();
-$content .= $helpFragment->parse('join_help_modal.php');
 $error = '';
 $message = '';
 
@@ -17,7 +14,7 @@ $sql->setQuery($tablesQuery);
 $tables = $sql->getArray();
 $tables = array_column($tables, 'table_name');
 
-// Get current state from URL/Session
+// Get current state from session
 $joins = rex_session('join_builder_joins', 'array', [
     [
         'left_table' => '',
@@ -77,24 +74,23 @@ if ($func) {
             }
             break;
 
-        case 'toggle_column':
+        case 'select_type':
+            $index = rex_request('index', 'int');
+            $type = rex_request('type', 'string');
+            
+            if (isset($joins[$index])) {
+                $joins[$index]['type'] = $type;
+                rex_set_session('join_builder_joins', $joins);
+            }
+            break;
+
+        case 'update_columns':
             $table = rex_request('table', 'string');
-            $column = rex_request('column', 'string');
-            
-            if (!isset($selectedColumns[$table])) {
-                $selectedColumns[$table] = [];
+            $selectedCols = rex_request('columns', 'string');
+            if ($table && $selectedCols) {
+                $selectedColumns[$table] = json_decode($selectedCols) ?: [];
+                rex_set_session('join_builder_columns', $selectedColumns);
             }
-            
-            if (in_array($column, $selectedColumns[$table])) {
-                $selectedColumns[$table] = array_diff($selectedColumns[$table], [$column]);
-                if (empty($selectedColumns[$table])) {
-                    unset($selectedColumns[$table]);
-                }
-            } else {
-                $selectedColumns[$table][] = $column;
-            }
-            
-            rex_set_session('join_builder_columns', $selectedColumns);
             break;
 
         case 'reset':
@@ -168,6 +164,10 @@ if ($message) {
     $content .= rex_view::success($message);
 }
 
+// Add help modal
+$helpFragment = new rex_fragment();
+$content .= $helpFragment->parse('join_help_modal.php');
+
 // Build JOIN UI
 foreach ($joins as $index => $join) {
     $fragment = new rex_fragment();
@@ -226,8 +226,19 @@ if (isset($generatedCode)) {
         </div>
         <div class="panel-body">
             <pre class="rex-code">' . rex_escape($generatedCode) . '</pre>
+            <button class="btn btn-default" onclick="copyToClipboard()">
+                <i class="rex-icon fa-copy"></i> In Zwischenablage kopieren
+            </button>
         </div>
-    </div>';
+    </div>
+    <script>
+    function copyToClipboard() {
+        const code = document.querySelector(".rex-code").textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            alert("Code wurde in die Zwischenablage kopiert!");
+        });
+    }
+    </script>';
 }
 
 // Create page fragment
