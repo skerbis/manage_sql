@@ -31,6 +31,9 @@ page:
             title: 'REX SQLTable'
             icon: rex-icon fa-code
             itemclass: pull-right
+        join:
+            title: 'JOIN Builder'
+            icon: rex-icon fa-link
         edit:
             title: 'Tabelle bearbeiten'
             icon: rex-icon fa-edit
