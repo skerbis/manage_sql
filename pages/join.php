@@ -5,10 +5,14 @@ $message = '';
 
 // Get all tables
 $sql = rex_sql::factory();
-$tables = $sql->getTablesAndViews();
-$tables = array_filter($tables, function($table) {
-    return str_starts_with($table, 'rex_');
-});
+$tablesQuery = 'SELECT `table_name` 
+               FROM INFORMATION_SCHEMA.TABLES 
+               WHERE `table_schema` = DATABASE() 
+               AND `table_name` LIKE "rex_%"
+               ORDER BY `table_name`';
+$sql->setQuery($tablesQuery);
+$tables = $sql->getArray();
+$tables = array_column($tables, 'table_name');
 
 // Get current state from URL/Session
 $joins = rex_session('join_builder_joins', 'array', [
