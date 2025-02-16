@@ -8,21 +8,22 @@ $selectedColumns = $this->getVar('selectedColumns');
         <div class="panel-title"><?= $table ?></div>
     </div>
     <div class="panel-body">
-        <div class="rex-select-style">
+        <select class="form-control selectpicker" 
+                name="columns[<?= $table ?>][]" 
+                multiple
+                data-live-search="true"
+                data-actions-box="true"
+                data-selected-text-format="count > 3"
+                onchange="window.location='<?= rex_url::currentBackendPage([
+                    'func' => 'update_columns',
+                    'table' => $table
+                ]) ?>&columns=' + JSON.stringify($(this).val())">
             <?php foreach ($columns as $column): ?>
-                <div class="checkbox">
-                    <label>
-                        <a href="<?= rex_url::currentBackendPage([
-                            'func' => 'toggle_column',
-                            'table' => $table,
-                            'column' => $column
-                        ]) ?>" class="<?= in_array($column, $selectedColumns) ? 'text-primary' : 'text-muted' ?>">
-                            <i class="rex-icon <?= in_array($column, $selectedColumns) ? 'fa-check-square-o' : 'fa-square-o' ?>"></i>
-                            <?= $column ?>
-                        </a>
-                    </label>
-                </div>
+                <option value="<?= $column ?>" 
+                    <?= in_array($column, $selectedColumns) ? ' selected' : '' ?>>
+                    <?= $column ?>
+                </option>
             <?php endforeach; ?>
-        </div>
+        </select>
     </div>
 </div>
