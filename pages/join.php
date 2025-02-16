@@ -1,5 +1,8 @@
 <?php
 $content = '';
+// Nach dem Titel, vor den JOINs
+$helpFragment = new rex_fragment();
+$content .= $helpFragment->parse('join_help_modal.php');
 $error = '';
 $message = '';
 
