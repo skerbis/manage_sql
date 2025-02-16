@@ -108,7 +108,25 @@ if ($func) {
                         $selectParts[] = $table . '.' . $column;
                     }
                 }
-                $selectClause = empty($selectParts) ? '*' : implode(', ', $selectParts);
+                // Wenn keine Spalten ausgewählt sind, alle Spalten mit Tabellen-Prefix auswählen
+                if (empty($selectParts)) {
+                    $selectParts = [];
+                    foreach ($joins as $join) {
+                        if (!empty($join['left_table'])) {
+                            $columns = rex_sql::showColumns($join['left_table']);
+                            foreach ($columns as $column) {
+                                $selectParts[] = $join['left_table'] . '.' . $column['name'] . ' AS ' . $join['left_table'] . '_' . $column['name'];
+                            }
+                        }
+                        if (!empty($join['right_table'])) {
+                            $columns = rex_sql::showColumns($join['right_table']);
+                            foreach ($columns as $column) {
+                                $selectParts[] = $join['right_table'] . '.' . $column['name'] . ' AS ' . $join['right_table'] . '_' . $column['name'];
+                            }
+                        }
+                    }
+                }
+                $selectClause = implode(', ', array_unique($selectParts));
                 
                 $joinClauses = [];
                 $firstTable = '';
