@@ -113,19 +113,19 @@ if ($action && !$csrfToken->isValid()) {
                 break;
 
             case 'replace':
-                $replaceColumn = rex_post('replace_column', 'string');
-                $searchTerm = rex_post('search_term', 'string');
-                $replaceTerm = rex_post('replace_term', 'string');
+    $replaceColumn = rex_post('replace_column', 'string');
+    $searchTerm = rex_post('search_term', 'string');
+    $replaceTerm = rex_post('replace_term', 'string', ''); // Default to empty string if not set
 
-                if ($replaceColumn && $searchTerm) {
-                    $sql->setQuery(
-                        'UPDATE ' . $selectedTable . '
-                         SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
-                        ['search' => $searchTerm, 'replace' => $replaceTerm]
-                    );
-                    $message = $sql->getRows() . ' Datensätze aktualisiert.';
-                }
-                break;
+    if ($replaceColumn && $searchTerm !== '') { // Changed condition to check if searchTerm is set (can be empty string)
+        $sql->setQuery(
+            'UPDATE ' . $selectedTable . '
+             SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
+            ['search' => $searchTerm, 'replace' => $replaceTerm]
+        );
+        $message = $sql->getRows() . ' Datensätze aktualisiert.';
+    }
+    break;
 
             case 'delete_results':
                 $searchColumn = rex_post('search_column', 'string');
@@ -403,7 +403,7 @@ if ($editId || $addMode) {
                                 </div>
                                 <div class="col-sm-4">
                                     <div class="input-group">
-                                        <input type="text" name="replace_term" class="form-control" placeholder="Ersetzen durch..." required>
+                                        <input type="text" name="replace_term" class="form-control" placeholder="Ersetzen durch...">
                                         <span class="input-group-btn">
                                             <button type="submit" class="btn btn-primary" onclick="return confirm(\'Ersetzen wirklich durchführen?\')">
                                                 <i class="rex-icon fa-exchange"></i>
