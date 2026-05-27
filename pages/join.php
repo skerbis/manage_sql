@@ -2,6 +2,7 @@
 $content = '';
 $error = '';
 $message = '';
+$csrfToken = rex_csrf_token::factory('manage_sql_join_builder');
 
 // Get all tables
 $sql = rex_sql::factory();
@@ -13,6 +14,8 @@ $tablesQuery = 'SELECT `table_name`
 $sql->setQuery($tablesQuery);
 $tables = $sql->getArray();
 $tables = array_column($tables, 'table_name');
+
+$joinTypes = ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN'];
 
 // Get current state from session
 $joins = rex_session('join_builder_joins', 'array', [
@@ -27,13 +30,38 @@ $joins = rex_session('join_builder_joins', 'array', [
 
 $selectedColumns = rex_session('join_builder_columns', 'array', []);
 
+/**
+ * @return string[]
+ */
+function getTableColumns(string $table, array $tables): array
+{
+    if (!in_array($table, $tables, true)) {
+        return [];
+    }
+
+    return array_column(rex_sql::showColumns($table), 'name');
+}
+
 // Handle actions
-$func = rex_request('func', 'string');
+$requestMethod = strtolower(rex_request_method());
+$func = 'post' === $requestMethod ? rex_post('func', 'string') : rex_get('func', 'string');
 if ($func) {
+    $mutatingFuncs = ['add_join', 'remove_join', 'select_table', 'select_column', 'select_type', 'update_columns', 'reset'];
+    if (in_array($func, $mutatingFuncs, true)) {
+        if ('post' !== $requestMethod) {
+            $error = 'Ungültige Request-Methode.';
+        } elseif (!$csrfToken->isValid()) {
+            $error = rex_i18n::msg('csrf_token_invalid');
+        }
+    }
+}
+
+if ($func && '' === $error) {
     switch($func) {
         case 'add_join':
+            $lastJoin = end($joins);
             $joins[] = [
-                'left_table' => end($joins)['right_table'],
+                'left_table' => is_array($lastJoin) ? (string) ($lastJoin['right_table'] ?? '') : '',
                 'left_column' => '',
                 'right_table' => '',
                 'right_column' => '',
@@ -56,7 +84,7 @@ if ($func) {
             $side = rex_request('side', 'string');
             $table = rex_request('table', 'string');
             
-            if (isset($joins[$index])) {
+            if (isset($joins[$index]) && in_array($side, ['left', 'right'], true) && in_array($table, $tables, true)) {
                 $joins[$index][$side . '_table'] = $table;
                 $joins[$index][$side . '_column'] = '';
                 rex_set_session('join_builder_joins', $joins);
@@ -68,7 +96,13 @@ if ($func) {
             $side = rex_request('side', 'string');
             $column = rex_request('column', 'string');
             
-            if (isset($joins[$index])) {
+            if (isset($joins[$index]) && in_array($side, ['left', 'right'], true)) {
+                $table = (string) ($joins[$index][$side . '_table'] ?? '');
+                $allowedColumns = getTableColumns($table, $tables);
+                if (!in_array($column, $allowedColumns, true)) {
+                    break;
+                }
+
                 $joins[$index][$side . '_column'] = $column;
                 rex_set_session('join_builder_joins', $joins);
             }
@@ -78,7 +112,7 @@ if ($func) {
             $index = rex_request('index', 'int');
             $type = rex_request('type', 'string');
             
-            if (isset($joins[$index])) {
+            if (isset($joins[$index]) && in_array($type, $joinTypes, true)) {
                 $joins[$index]['type'] = $type;
                 rex_set_session('join_builder_joins', $joins);
             }
@@ -87,8 +121,12 @@ if ($func) {
         case 'update_columns':
             $table = rex_request('table', 'string');
             $selectedCols = rex_request('columns', 'string');
-            if ($table && $selectedCols) {
-                $selectedColumns[$table] = json_decode($selectedCols) ?: [];
+            if ($table && $selectedCols && in_array($table, $tables, true)) {
+                $decodedColumns = json_decode($selectedCols, true);
+                $allowedColumns = getTableColumns($table, $tables);
+                $selectedColumns[$table] = is_array($decodedColumns)
+                    ? array_values(array_filter($decodedColumns, static fn ($col) => is_string($col) && in_array($col, $allowedColumns, true)))
+                    : [];
                 rex_set_session('join_builder_columns', $selectedColumns);
             }
             break;
@@ -260,20 +298,28 @@ foreach ($joins as $index => $join) {
     $fragment->setVar('index', $index);
     $fragment->setVar('join', $join);
     $fragment->setVar('tables', $tables);
-    $fragment->setVar('columns', function($table) {
-        return $table ? array_column(rex_sql::showColumns($table), 'name') : [];
+    $fragment->setVar('columns', function($table) use ($tables) {
+        return getTableColumns((string) $table, $tables);
     });
+    $fragment->setVar('csrfParams', $csrfToken->getUrlParams());
     $content .= $fragment->parse('join_row.php');
 }
 
 // Add/Remove buttons
-$addUrl = rex_url::currentBackendPage(['func' => 'add_join']);
-$resetUrl = rex_url::currentBackendPage(['func' => 'reset']);
+$actionUrl = rex_url::currentBackendPage();
 
 $content .= '
 <div class="btn-toolbar">
-    <a class="btn btn-default" href="'.$addUrl.'"><i class="rex-icon fa-plus"></i> JOIN hinzufügen</a>
-    <a class="btn btn-default" href="'.$resetUrl.'"><i class="rex-icon fa-times"></i> Zurücksetzen</a>
+    <form action="'.$actionUrl.'" method="post" style="display:inline-block; margin:0 8px 0 0;">
+        <input type="hidden" name="func" value="add_join">
+        '.$csrfToken->getHiddenField().'
+        <button type="submit" class="btn btn-default"><i class="rex-icon fa-plus"></i> JOIN hinzufügen</button>
+    </form>
+    <form action="'.$actionUrl.'" method="post" style="display:inline-block; margin:0;">
+        <input type="hidden" name="func" value="reset">
+        '.$csrfToken->getHiddenField().'
+        <button type="submit" class="btn btn-default"><i class="rex-icon fa-times"></i> Zurücksetzen</button>
+    </form>
 </div>';
 
 // Column selection
@@ -287,12 +333,17 @@ foreach ($joins as $join) {
 $usedTables = array_unique($usedTables);
 
 foreach ($usedTables as $table) {
-    $columns = array_column(rex_sql::showColumns($table), 'name');
+    if (!in_array($table, $tables, true)) {
+        continue;
+    }
+
+    $columns = getTableColumns($table, $tables);
     
     $fragment = new rex_fragment();
     $fragment->setVar('table', $table);
     $fragment->setVar('columns', $columns);
     $fragment->setVar('selectedColumns', $selectedColumns[$table] ?? []);
+    $fragment->setVar('csrfParams', $csrfToken->getUrlParams());
     $content .= $fragment->parse('column_selection.php');
 }
 
@@ -319,19 +370,11 @@ if (isset($generatedCode)) {
         </div>
         <div class="panel-body">
             <pre class="rex-code">' . rex_escape($generatedCode) . '</pre>
-            <button class="btn btn-default" onclick="copyToClipboard()">
+            <button class="btn btn-default" onclick="manageSqlCopyToClipboard(\'.rex-code\', \'Code wurde in die Zwischenablage kopiert!\')">
                 <i class="rex-icon fa-copy"></i> In Zwischenablage kopieren
             </button>
         </div>
-    </div>
-    <script>
-    function copyToClipboard() {
-        const code = document.querySelector(".rex-code").textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            alert("Code wurde in die Zwischenablage kopiert!");
-        });
-    }
-    </script>';
+    </div>';
 }
 
 // Create page fragment

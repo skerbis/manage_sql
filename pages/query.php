@@ -32,17 +32,9 @@ if (rex_post('generate', 'boolean') || rex_post('test_query', 'boolean')) {
     $fragment->setVar('title', 'Generierter Code');
     $fragment->setVar('body', '
         <pre class="pre-scrollable"><code>' . rex_escape($code) . '</code></pre>
-        <button class="btn btn-default" onclick="copyToClipboard()">
+        <button class="btn btn-default" onclick="manageSqlCopyToClipboard(\'pre code\', \'Code wurde in die Zwischenablage kopiert!\')">
             <i class="rex-icon fa-copy"></i> In Zwischenablage kopieren
         </button>
-        <script>
-        function copyToClipboard() {
-            const code = document.querySelector("pre code").textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                alert("Code wurde in die Zwischenablage kopiert!");
-            });
-        }
-        </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
 
@@ -246,85 +238,7 @@ if ($selectedTable && !empty($columns)) {
     </form>';
 }
 
-$formContent .= '
-<script>
-function toggleQueryOptions(type) {
-    const selectOptions = document.querySelectorAll(".select-options");
-    const wherePanel = document.querySelector(".where-panel");
-    
-    selectOptions.forEach(el => {
-        el.style.display = type === "select" ? "block" : "none";
-    });
-    
-    wherePanel.style.display = ["select", "update", "delete"].includes(type) ? "block" : "none";
-}
-
-function toggleAllColumns(checkbox) {
-    const columnCheckboxes = document.querySelectorAll(".column-checkbox");
-    const columnList = document.getElementById("column-list");
-    
-    columnCheckboxes.forEach(cb => {
-        cb.checked = checkbox.checked;
-    });
-    
-    // Toggle visibility of individual columns
-    columnList.style.display = checkbox.checked ? "none" : "flex";
-}
-
-function addWhereRow() {
-    const container = document.getElementById("where-conditions");
-    const template = container.querySelector(".where-row").cloneNode(true);
-    // Reset input values
-    template.querySelectorAll("select, input").forEach(el => el.value = "");
-    container.appendChild(template);
-}
-
-function removeWhereRow(button) {
-    const row = button.closest(".where-row");
-    if (document.querySelectorAll(".where-row").length > 1) {
-        row.remove();
-    }
-}
-
-function addOrderByRow() {
-    const container = document.getElementById("orderby-conditions");
-    const template = container.querySelector(".orderby-row").cloneNode(true);
-    // Reset select values
-    template.querySelectorAll("select").forEach(el => el.value = "");
-    container.appendChild(template);
-}
-
-function removeOrderByRow(button) {
-    const row = button.closest(".orderby-row");
-    if (document.querySelectorAll(".orderby-row").length > 1) {
-        row.remove();
-    }
-}
-
-// Initial state
-document.addEventListener("DOMContentLoaded", function() {
-    const selectAll = document.getElementById("select_all");
-    if (selectAll) {
-        const columnList = document.getElementById("column-list");
-        columnList.style.display = selectAll.checked ? "none" : "flex";
-        
-        // Add event listeners to individual checkboxes
-        const columnCheckboxes = document.querySelectorAll(".column-checkbox");
-        columnCheckboxes.forEach(cb => {
-            cb.addEventListener("change", function() {
-                const allChecked = Array.from(columnCheckboxes).every(cb => cb.checked);
-                document.getElementById("select_all").checked = allChecked;
-            });
-        });
-        
-        // Initial query type options
-        const queryType = document.getElementById("query_type");
-        if (queryType) {
-            toggleQueryOptions(queryType.value);
-        }
-    }
-});
-</script>';
+// JS logic is loaded via addon asset manage_sql.js
 
 // Add form to content
 $fragment = new rex_fragment();

@@ -2,6 +2,8 @@
 $content = '';
 $error = '';
 $message = '';
+$testResult = '';
+$csrfToken = rex_csrf_token::factory('manage_sql_view_builder');
 
 // Get query from session if exists
 $query = rex_session('view_builder_query', 'string', '');
@@ -88,8 +90,7 @@ if ($func) {
                 rex_set_session('view_builder_name', '');
                 
                 // Redirect to prevent refresh-recreation
-                header('Location: ' . rex_url::currentBackendPage(['info' => 'view_created']));
-                exit;
+                rex_response::sendRedirect(rex_url::currentBackendPage(['info' => 'view_created']));
                 
             } catch (rex_sql_exception $e) {
                 $error = 'Fehler beim Erstellen der View: ' . $e->getMessage();
@@ -97,10 +98,20 @@ if ($func) {
             break;
             
         case 'delete':
-            $viewName = rex_get('view_name', 'string');
+            if (!$csrfToken->isValid()) {
+                $error = rex_i18n::msg('csrf_token_invalid');
+                break;
+            }
+
+            $viewName = rex_post('view_name', 'string');
             
             if (!$viewName) {
                 $error = 'Kein View-Name angegeben.';
+                break;
+            }
+
+            if (!preg_match('/^rex_view_[a-zA-Z0-9_]+$/', $viewName)) {
+                $error = 'Ungültiger View-Name.';
                 break;
             }
             
@@ -143,10 +154,14 @@ if ($existingViews) {
         $viewsList .= '<tr>
             <td>' . $view['table_name'] . '</td>
             <td>
-                <a href="' . rex_url::currentBackendPage(['func' => 'delete', 'view_name' => $view['table_name']]) . '" 
-                   class="btn btn-delete" onclick="return confirm(\'View wirklich löschen?\')">
-                    <i class="rex-icon fa-trash"></i> Löschen
-                </a>
+                <form action="' . rex_url::currentBackendPage() . '" method="post" style="display:inline-block; margin:0;">
+                    <input type="hidden" name="func" value="delete">
+                    <input type="hidden" name="view_name" value="' . rex_escape($view['table_name']) . '">
+                    ' . $csrfToken->getHiddenField() . '
+                    <button type="submit" class="btn btn-delete" onclick="return confirm(\'View wirklich löschen?\')">
+                        <i class="rex-icon fa-trash"></i> Löschen
+                    </button>
+                </form>
             </td>
         </tr>';
     }

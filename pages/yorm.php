@@ -194,17 +194,9 @@ if ($selectedTable && !empty($columns)) {
             Speichern Sie diesen Code als <code>' . $className . '.php</code>
         </div>
         <pre id="model-code" class="pre-scrollable"><code class="php">' . rex_escape(implode("\n", $modelCode)) . '</code></pre>
-        <button class="btn btn-default" onclick="copyModelCode()">
+        <button class="btn btn-default" onclick="manageSqlCopyToClipboard(\'#model-code code\', \'Model-Code wurde in die Zwischenablage kopiert!\')">
             <i class="rex-icon fa-copy"></i> Model-Code kopieren
         </button>
-        <script>
-        function copyModelCode() {
-            const code = document.querySelector("#model-code code").textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                alert("Model-Code wurde in die Zwischenablage kopiert!");
-            });
-        }
-        </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
 
@@ -283,18 +275,9 @@ if ($selectedTable && !empty($columns)) {
                 </div>
             </div>
         </div>
-        <button class="btn btn-default" onclick="copyFormCode()">
+        <button class="btn btn-default" onclick="manageSqlCopyToClipboard(\'.tab-pane.active code\', \'Code wurde in die Zwischenablage kopiert!\')">
             <i class="rex-icon fa-copy"></i> Code in Zwischenablage kopieren
         </button>
-        <script>
-        function copyFormCode() {
-            const activeTab = document.querySelector(".tab-pane.active");
-            const code = activeTab.querySelector("code").textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                alert("Code wurde in die Zwischenablage kopiert!");
-            });
-        }
-        </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
 
@@ -440,17 +423,9 @@ if ($selectedTable && !empty($columns)) {
     $fragment->setVar('title', 'Query Beispiele');
     $fragment->setVar('body', '
         <pre id="query-code" class="pre-scrollable"><code class="php">'.rex_escape(implode("\n", $queryCode)).'</code></pre>
-        <button class="btn btn-default" onclick="copyQueryCode()">
+        <button class="btn btn-default" onclick="manageSqlCopyToClipboard(\'#query-code code\', \'Query-Code wurde in die Zwischenablage kopiert!\')">
             <i class="rex-icon fa-copy"></i> Query-Code kopieren
         </button>
-        <script>
-        function copyQueryCode() {
-            const code = document.querySelector("#query-code code").textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                alert("Query-Code wurde in die Zwischenablage kopiert!");
-            });
-        }
-        </script>
     ', false);
     $content .= $fragment->parse('core/page/section.php');
 }

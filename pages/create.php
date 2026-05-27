@@ -147,33 +147,6 @@ $fragment->setVar('body', '
     <script type="text/template" id="column-template">
     ' . $columnTemplate . '
     </script>
-
-    <script>
-    let columnIndex = 0;
-
-    function addColumn() {
-        const container = document.getElementById("columns-container");
-        const template = document.getElementById("column-template").innerHTML;
-        
-        // Replace placeholder index
-        const html = template.replace(/{{index}}/g, columnIndex++);
-        
-        // Create temporary element to convert string to DOM
-        const temp = document.createElement("div");
-        temp.innerHTML = html;
-        
-        // Add new column row
-        container.appendChild(temp.firstElementChild);
-    }
-
-    function removeColumn(button) {
-        const row = button.closest(".column-row");
-        row.remove();
-    }
-
-    // Add first column row
-    addColumn();
-    </script>
 ', false);
 
 $content .= $fragment->parse('core/page/section.php');

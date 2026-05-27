@@ -1,7 +1,5 @@
 <?php
 
-use Symfony\Component\Mime\Message;
-
 $content = '';
 $message = '';
 $error = '';
@@ -12,8 +10,6 @@ $debug = false; // Auf 'true' setzen, um Debug-Ausgaben zu aktivieren
 // Get selected table and handle actions
 $selectedTable = rex_get('table', 'string');
 $action = rex_post('action', 'string');
-$recordAction = rex_get('record_action', 'string');
-$recordId = rex_get('record_id', 'int');
 $editId = rex_request('edit_id', 'int', 0);
 $addMode = rex_get('func') === 'add';
 $searchData = rex_session('table_records_search', 'array');
@@ -24,6 +20,23 @@ $csrfToken = rex_csrf_token::factory('table_records');
 // SQL instance
 $sql = rex_sql::factory();
 $sql->setDebug($debug);
+
+// Get all allowed tables
+$tables = $sql->getTablesAndViews();
+$tables = array_values(array_filter($tables, static function ($table) {
+    return str_starts_with((string) $table, 'rex_');
+}));
+
+if ('' !== $selectedTable && !in_array($selectedTable, $tables, true)) {
+    $selectedTable = '';
+    $searchData = [];
+    $error = 'Ungültige Tabelle ausgewählt.';
+}
+
+$availableColumns = [];
+if ('' !== $selectedTable) {
+    $availableColumns = array_column(rex_sql::showColumns($selectedTable), 'name');
+}
 
 // --- Functions ---
 
@@ -37,11 +50,15 @@ $sql->setDebug($debug);
  *
  * @return array An associative array containing the WHERE clause and parameters.
  */
-function buildWhereClause(string $column, string $term, string $type, rex_sql $sqlInstance): array
+function buildWhereClause(string $column, string $term, string $type, rex_sql $sqlInstance, array $allowedColumns): array
 {
     $where = '';
     if (!$column || !$term) {
         return ['where' => '', 'params' => []];  // Return empty WHERE clause if column or term is missing
+    }
+
+    if (!in_array($column, $allowedColumns, true)) {
+        return ['where' => '', 'params' => []];
     }
 
     $column = '`' . rex_escape($column) . '`'; // Escape and quote the column name
@@ -82,6 +99,13 @@ function getActionButton(string $url, string $iconClass, string $title, bool $co
 
 // --- ACTION HANDLER ---
 
+if (($action || $editId || $addMode) && '' === $selectedTable) {
+    $error = '' === $error ? 'Keine gültige Tabelle ausgewählt.' : $error;
+    $action = '';
+    $editId = 0;
+    $addMode = false;
+}
+
 if ($action && !$csrfToken->isValid()) {
     $error = rex_i18n::msg('csrf_token_invalid');
 } elseif ($action) {
@@ -101,31 +125,37 @@ if ($action && !$csrfToken->isValid()) {
                 rex_set_session('table_records_search', $searchData);
 
                 // Build WHERE clause based on search type
-                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql);  // Pass $sql
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql, $availableColumns);
                 $where = $whereData['where'];
-                $params = $whereData['params'];
 
                 if ($where) {
                     $sql->setQuery('SELECT COUNT(*) as count FROM ' . $selectedTable . ' WHERE ' . $where); // No parameters
                     $count = $sql->getValue('count');
                     $message = $count . ' Datensätze gefunden.';
+                } else {
+                    $error = 'Ungültige Suchparameter.';
                 }
                 break;
 
             case 'replace':
-    $replaceColumn = rex_post('replace_column', 'string');
-    $searchTerm = rex_post('search_term', 'string');
-    $replaceTerm = rex_post('replace_term', 'string', ''); // Default to empty string if not set
+                $replaceColumn = rex_post('replace_column', 'string');
+                $searchTerm = rex_post('search_term', 'string');
+                $replaceTerm = rex_post('replace_term', 'string', '');
 
-    if ($replaceColumn && $searchTerm !== '') { // Changed condition to check if searchTerm is set (can be empty string)
-        $sql->setQuery(
-            'UPDATE ' . $selectedTable . '
-             SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
-            ['search' => $searchTerm, 'replace' => $replaceTerm]
-        );
-        $message = $sql->getRows() . ' Datensätze aktualisiert.';
-    }
-    break;
+                if (!in_array($replaceColumn, $availableColumns, true)) {
+                    $error = 'Ungültige Spalte für Ersetzen.';
+                    break;
+                }
+
+                if ($searchTerm !== '') {
+                    $sql->setQuery(
+                        'UPDATE ' . $selectedTable . '
+                         SET `' . rex_escape($replaceColumn) . '` = REPLACE(`' . rex_escape($replaceColumn) . '`, :search, :replace)',
+                        ['search' => $searchTerm, 'replace' => $replaceTerm]
+                    );
+                    $message = $sql->getRows() . ' Datensätze aktualisiert.';
+                }
+                break;
 
             case 'delete_results':
                 $searchColumn = rex_post('search_column', 'string');
@@ -133,9 +163,8 @@ if ($action && !$csrfToken->isValid()) {
                 $searchType = rex_post('search_type', 'string');
 
                 // Build WHERE clause based on search type
-                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql);  // Pass $sql
+                $whereData = buildWhereClause($searchColumn, $searchTerm, $searchType, $sql, $availableColumns);
                 $where = $whereData['where'];
-                $params = $whereData['params'];
 
                 if ($where) {
                     try {
@@ -149,6 +178,8 @@ if ($action && !$csrfToken->isValid()) {
                     } catch (rex_sql_exception $e) {
                         $error = $e->getMessage();
                     }
+                } else {
+                    $error = 'Ungültige Suchparameter.';
                 }
                 break;
 
@@ -157,11 +188,21 @@ if ($action && !$csrfToken->isValid()) {
                 $message = 'Tabelle wurde geleert.';
                 break;
 
+            case 'delete_single':
+                $recordId = rex_post('record_id', 'int');
+                if ($recordId > 0 && in_array('id', $availableColumns, true)) {
+                    $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
+                    $message = 'Datensatz gelöscht.';
+                }
+                break;
+
             case 'save':
             case 'create':
                 $data = rex_post('data', 'array', []);
 
                 if ($data) {
+                    $allowedDataColumns = array_values(array_filter($availableColumns, static fn ($column) => 'id' !== $column));
+                    $data = array_intersect_key($data, array_flip($allowedDataColumns));
                     $sql->setTable($selectedTable);
                     if ($action === 'save') {
                         $sql->setWhere(['id' => rex_post('record_id', 'int')]);
@@ -181,29 +222,11 @@ if ($action && !$csrfToken->isValid()) {
     }
 }
 
-// Handle single record actions
-if ($recordAction && $recordId && $csrfToken->isValid()) {
-    try {
-        if ($recordAction === 'delete') {
-            $sql->setQuery('DELETE FROM ' . $selectedTable . ' WHERE id = :id', ['id' => $recordId]);
-            $message = 'Datensatz gelöscht.';
-        }
-    } catch (rex_sql_exception $e) {
-        $error = $e->getMessage();
-    }
-}
-
 // Handle search reset
 if (rex_get('reset_search', 'bool')) {
     rex_unset_session('table_records_search');
     $searchData = []; // Reset $searchData as well
 }
-
-// Get all tables
-$tables = $sql->getTablesAndViews();
-$tables = array_filter($tables, function ($table) {
-    return str_starts_with($table, 'rex_');
-});
 
 // Show messages
 if ($error) {
@@ -233,10 +256,6 @@ $fragment = new rex_fragment();
 $fragment->setVar('title', 'Tabelle auswählen');
 $fragment->setVar('body', $formContent, false);
 $content .= $fragment->parse('core/page/section.php');
-
-if ($selectedTable) {
-    echo '<pre>selectedTable: ' . $selectedTable . '</pre>'; // Debug Table Name
-}
 
 // --- ADDED: Reset Filter Button (Outside Accordion) ---
 if ($searchData) {
@@ -450,18 +469,16 @@ if ($editId || $addMode) {
 
         // Build base query for list
         $whereCondition = '';
-        $params = [];
 
         // Apply search filter if exists
         if ($searchData) {
-            $whereData = buildWhereClause($searchData['column'], $searchData['term'], $searchData['type'], $sql);  // Pass $sql
-            $whereCondition = ' WHERE ' . $whereData['where'];
-            $params = $whereData['params'];
+            $whereData = buildWhereClause($searchData['column'], $searchData['term'], $searchData['type'], $sql, $columnNames);
+            if ('' !== $whereData['where']) {
+                $whereCondition = ' WHERE ' . $whereData['where'];
+            }
         }
 
         $query = 'SELECT * FROM ' . $selectedTable . $whereCondition . ' ORDER BY id DESC';
-
-        echo '<pre>Final Query: ' . $query . '</pre>'; // Debug Query
 
         try {
             $list = rex_list::factory($query);
@@ -476,13 +493,17 @@ if ($editId || $addMode) {
 
                 $editUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'edit_id' => $id]);
                 $copyUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'func' => 'add', 'id' => $id]);
-                $deleteUrl = rex_url::currentBackendPage(['table' => $selectedTable, 'record_action' => 'delete', 'record_id' => $id]) . '&' . $csrfToken->getUrlParams();
 
                 $editButton = getActionButton($editUrl, 'fa-edit', 'Bearbeiten', false, 'btn-edit');
                 $copyButton = getActionButton($copyUrl, 'fa-copy', 'Kopieren');
-                $deleteButton = getActionButton($deleteUrl, 'fa-trash', 'Löschen', 'Wirklich löschen?', 'btn-delete');
+                $deleteForm = '<form action="' . rex_url::currentBackendPage(['table' => $selectedTable]) . '" method="post" style="display:inline-block; margin:0;">'
+                    . '<input type="hidden" name="action" value="delete_single">'
+                    . '<input type="hidden" name="record_id" value="' . (int) $id . '">'
+                    . $csrfToken->getHiddenField()
+                    . '<button type="submit" class="btn btn-delete btn-xs" title="Löschen" onclick="return confirm(\'Wirklich löschen?\')"><i class="rex-icon fa-trash"></i></button>'
+                    . '</form>';
 
-                return '<div class="btn-group">' . $editButton . $copyButton . $deleteButton . '</div>';
+                return '<div class="btn-group">' . $editButton . $copyButton . $deleteForm . '</div>';
             });
 
             // Format columns based on data type
