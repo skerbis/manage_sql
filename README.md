@@ -1,108 +1,105 @@
-# Manage SQL für REDAXO 5
+# manage_sql for REDAXO 5
 
-Table Builder ist ein REDAXO-AddOn zur vereinfachten Arbeit mit Datenbanktabellen, rex_sql und YOrm. Es unterstützt bei der korrekten Erstellung von Datenbankabfragen und der Generierung von YOrm-Modellen.
+manage_sql is a backend addon for working with database structure, SQL queries,
+YORM code generation and data migration directly in REDAXO.
+
+Current focus in `1.0.0`:
+- practical table and query tools
+- safer backend actions (CSRF/method checks in key areas)
+- interactive data migration helper with test-run
 
 ## Features
 
-### Datenbank-Management
-- Visuelle Erstellung und Bearbeitung von Datenbanktabellen
-- Erstellen und Bearbeiten von Datensätzen
-- Suchen und Ersetzen in Values
-- Automatische Erstellung von korrekten Tabellenstrukturen inkl. Primärschlüssel
-- Verwaltung von Spaltentypen, Indizes und Fremdschlüsseln
+### Table and schema tools
+- list and inspect `rex_` tables
+- create tables with common column types
+- edit existing table columns
+- export table schema (`rex_sql_table` / schema dumper)
 
-### Query Builder
-- Visuelle Erstellung von rex_sql Queries
-- Automatische Generierung von sicherem Code
-- Unterstützung für komplexe WHERE-Bedingungen
-- Live-Vorschau der generierten Abfragen
-- Testmöglichkeit direkt im Backend
+### Query builder
+- build `SELECT` and `COUNT` queries with conditions
+- optional test-run directly in backend
+- generate ready-to-copy `rex_sql` code snippets
 
-### YOrm Generator
-- Automatische Generierung von YOrm-Model-Klassen
-- Erstellung von Type-Hints für bessere IDE-Unterstützung
-- Generierung von Getter-Methoden
-- Beispielcode für CRUD-Operationen
-- Relation-Handling
+### JOIN builder
+- interactive join definition across multiple tables
+- choose join type and selected columns
+- generate SQL/rex_sql snippets
+- run query preview for fast feedback
+
+### View builder
+- test custom SQL queries
+- create and remove SQL views (`rex_view_*`)
+
+### Records manager
+- browse table rows
+- create/edit/delete records
+- search, replace, and truncate actions
+- column-based formatting for overview tables
+
+### YORM generator
+- generate model boilerplate from YForm tables
+- generate form/list/query examples for faster integration
+
+### Data migration helper (new)
+- source table -> target table mapping UI
+- mapping modes per target field:
+    - source field
+    - constant value
+    - lookup mapping
+- transforms: `none`, `trim`, `lower`, `upper`
+- auto-mapping by field name
+- test-run preview (50 rows) with validation and action hints
+- migration run with batch size
+- duplicate strategy:
+    - insert
+    - skip
+    - update
+- optional: apply only changed rows
+
+## Requirements
+
+- PHP `>=8.1`
+- REDAXO `>=5.18.1`
+- YForm `>=4.0.0`
 
 ## Installation
 
-1. Im REDAXO-Installer das AddOn "manage_sql" herunterladen
-2. Installation und Aktivierung durchführen
-3. Rechte für Administratoren setzen
+1. Install addon `manage_sql` via REDAXO installer.
+2. Activate the addon.
+3. Use backend with admin permissions.
 
-## Systemvoraussetzungen
+## Backend pages
 
-* PHP 8.1 oder höher
-* REDAXO 5.18.1 oder höher
-* YForm 4.0.0 oder höher
+- Tables
+- Neue Tabelle
+- Query Builder
+- YORM Generator
+- REX SQLTable
+- View Builder
+- JOIN Builder
+- Data Manager
+- Datenmigration
 
-## Anwendungsbereiche
+## Notes
 
-### Tabellenerstellung
-- Strukturierte Anlage neuer Datenbanktabellen
-- Verwaltung bestehender Tabellenstrukturen
-- Export von Tabellendefinitionen als rex_sql_table Code
+- The addon is intended for experienced backend users.
+- Always run migrations on staging first.
+- For large datasets, use batch migration and test-run before execute.
 
-### Query-Erstellung
-- Generierung sicherer Datenbankabfragen
-- Unterstützung verschiedener Query-Typen (SELECT, INSERT, UPDATE, DELETE)
-- Automatische Parameterbindung
-- Beispiele für komplexe Abfragen
+## Known limitations (1.0.0)
 
-### YOrm-Integration
-- Model-Generierung für YForm-Tabellen
-- Erzeugen typsicherer Datenzugriffsmethoden
-- Beispiele für Relation-Handling
-- Generierung von Formular- und Listen-Code
+- Migration helper currently targets practical MVP workflows.
+- Advanced transform pipelines and profile persistence are planned for next releases.
 
-## Code-Beispiele
+## Support
 
-### Tabellendefinition
-```php
-// Generierter Code für eine neue Tabelle
-rex_sql_table::get(rex::getTable('example'))
-    ->ensurePrimaryIdColumn()
-    ->ensureColumn(new rex_sql_column('title', 'varchar(255)'))
-    ->ensureColumn(new rex_sql_column('description', 'text'))
-    ->ensure();
-```
+- Repository: https://github.com/skerbis/manage_sql
 
-### Query-Beispiel
-```php
-// Generierte sichere Abfrage
-$sql = rex_sql::factory();
-$sql->setQuery('SELECT * FROM rex_example WHERE status = :status', ['status' => 1]);
-```
+## License
 
-### YOrm-Model
-```php
-// Generiertes YOrm-Model
-class Example extends rex_yform_manager_dataset
-{
-    public function getTitle(): string 
-    {
-        return $this->getValue('title');
-    }
-    
-    public static function getAll(): rex_yform_manager_collection
-    {
-        return self::query()->find();
-    }
-}
-```
+- MIT, see `LICENSE`.
 
-## Unterstützung & Bugs
-noch unklar
+## Author
 
-## Lizenz
-
-MIT Lizenz, siehe [LICENSE.md](LICENSE.md)
-
-## Autor
-Thomas Skerbis
-
-## Credits
-
-- [REDAXO](https://redaxo.org)
-- Entwickelt mit rex_sql_table von [Gregor Harlan](https://github.com/gharlan)
+- Thomas Skerbis
